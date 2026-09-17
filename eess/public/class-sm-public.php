@@ -249,7 +249,11 @@ class SM_Public {
         wp_enqueue_style('dashicons');
         wp_enqueue_style('google-font-cairo', 'https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&family=Noto+Kufi+Arabic:wght@300;400;600;700;800&display=swap', array(), null);
         wp_enqueue_script('chart-js', 'https://cdn.jsdelivr.net/npm/chart.js', array(), '4.4.1', true);
-        wp_enqueue_script('html5-qrcode', SM_PLUGIN_URL . 'assets/js/html5-qrcode.min.js', array(), '2.3.8', true);
+        wp_register_script('html5-qrcode', SM_PLUGIN_URL . 'assets/js/html5-qrcode.min.js', array(), '2.3.8', true);
+        $active_tab = isset($_GET['sm_tab']) ? sanitize_text_field($_GET['sm_tab']) : '';
+        if ($active_tab === 'attendance') {
+            wp_enqueue_script('html5-qrcode');
+        }
         wp_enqueue_style($this->plugin_name, SM_PLUGIN_URL . 'assets/css/sm-public.css', array('dashicons'), $this->version, 'all');
 
         $app = SM_Settings::get_appearance();
@@ -5140,6 +5144,7 @@ class SM_Public {
     }
 
     public function shortcode_class_attendance() {
+        wp_enqueue_script('html5-qrcode');
         $user = wp_get_current_user();
         $roles = (array) $user->roles;
         $is_admin = in_array('administrator', $roles) || current_user_can('manage_options');
@@ -5665,56 +5670,6 @@ class SM_Public {
         wp_send_json_success('Updated');
     }
 
-    public function ajax_add_assignment() {
-        if (!is_user_logged_in()) wp_send_json_error('Unauthorized');
-        if (!wp_verify_nonce($_POST['sm_nonce'], 'sm_assignment_action')) wp_send_json_error('Security check');
-
-        $sender_id   = get_current_user_id();
-        $title       = sanitize_text_field($_POST['title'] ?? '');
-        $description = sanitize_textarea_field($_POST['description'] ?? '');
-        $file_url    = esc_url_raw($_POST['file_url'] ?? '');
-        $subject     = sanitize_text_field($_POST['subject'] ?? '');
-        $due_date    = sanitize_text_field($_POST['due_date'] ?? '');
-        $type        = sanitize_text_field($_POST['type'] ?? 'assignment');
-
-        $receivers = array();
-        if (!empty($_POST['receiver_ids'])) {
-            if (is_array($_POST['receiver_ids'])) {
-                $receivers = array_map('intval', $_POST['receiver_ids']);
-            } else {
-                $receivers = array_map('intval', explode(',', $_POST['receiver_ids']));
-            }
-        } elseif (!empty($_POST['receiver_id'])) {
-            $receivers[] = intval($_POST['receiver_id']);
-        }
-
-        $receivers = array_unique(array_filter($receivers));
-
-        if (empty($receivers) || empty($title)) {
-            wp_send_json_error('يرجى تحديد الطلاب المستهدفين وعنوان الواجب.');
-        }
-
-        $success_count = 0;
-        foreach ($receivers as $rec_id) {
-            $data = array(
-                'sender_id'   => $sender_id,
-                'receiver_id' => $rec_id,
-                'title'       => $title . (!empty($subject) ? " [$subject]" : ""),
-                'description' => $description . (!empty($due_date) ? "\n\nتاريخ التسليم: $due_date" : ""),
-                'file_url'    => $file_url,
-                'type'        => $type
-            );
-            if (SM_DB::add_assignment($data)) {
-                $success_count++;
-            }
-        }
-
-        if ($success_count > 0) {
-            wp_send_json_success(array('message' => "تم إرسال الواجب بنجاح إلى $success_count من الطلاب."));
-        } else {
-            wp_send_json_error('فشل إرسال الواجب.');
-        }
-    }
 
     public function ajax_approve_plan() {
         if (!current_user_can('مراجعة_التحضير')) wp_send_json_error('Unauthorized');
@@ -6328,7 +6283,7 @@ class SM_Public {
                 if (is_wp_error($res)) {
                     wp_die('خطأ في حفظ المادة المركزية: ' . $res->get_error_message());
                 }
-                wp_redirect(add_query_arg(array('sm_tab' => 'school-structure', 'sm_admin_msg' => 'settings_saved'), wp_get_referer()));
+                wp_redirect(add_query_arg(array('sm_admin_msg' => 'settings_saved'), wp_get_referer()));
                 exit;
             }
         }
@@ -7539,84 +7494,34 @@ class SM_Public {
     }
 
     public function ajax_download_student_import_template() {
-        if (!current_user_can('إدارة_الطلاب')) {
+        if (!current_user_can('إدارة_الطلاب') && !current_user_can('manage_options')) {
             wp_die('Unauthorized');
         }
 
         header('Content-Type: text/csv; charset=utf-8');
-        header('Content-Disposition: attachment; filename=student_import_template.csv');
+        header('Content-Disposition: attachment; filename=student_import_template_12cols.csv');
         $output = fopen('php://output', 'w');
         fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF)); // BOM for Excel
 
-        // Complete 30 Comprehensive Columns (A to AE) matching Export & Data Model
+        // Standardized 12 Columns in exact specified order
         fputcsv($output, array(
-            'كود الطالب (Student Code)',
-            'الرقم التسلسلي (Serial Number)',
-            'الاسم الكامل (Full Name)',
-            'الجنس (Gender)',
-            'تاريخ الميلاد (Date of Birth)',
-            'الجنسية (Nationality)',
-            'رقم الهوية الوطنية (National ID)',
-            'الصف الدراسي (Grade)',
-            'الشعبة / الفصل (Section)',
-            'العام الدراسي (Academic Year)',
-            'معرف المدرسة (School ID)',
-            'اسم ولي الأمر (Guardian Name)',
-            'صلة القرابة (Guardian Relationship)',
-            'البريد الإلكتروني لولي الأمر (Guardian Email)',
-            'رقم هاتف ولي الأمر (Guardian Phone)',
-            'حالة الطالب (Student Status)',
-            'حالة التسجيل (Enrollment Status)',
-            'تاريخ التسجيل (Enrollment Date)',
-            'الإمارة (Emirate)',
-            'العنوان (Address)',
-            'ملاحظة سلوكية (Student Behavior)',
-            'المستوى الأكاديمي (Academic Level)',
-            'أصحاب الهمم / احتياجات خاصة (Special Needs)',
-            'الحالة الصحية (Health Status)',
-            'الحساسية والتنبيهات الطبية (Allergies)',
-            'رابط الصورة الشخصية (Photo URL)',
-            'حالة الرسوم (Fee Status)',
-            'إجمالي الرسوم (Total Tuition Fees)',
-            'المبلغ المدفوع (Amount Paid)',
-            'المبلغ المتبقي (Outstanding Balance)',
-            'حالة الشيك / الدفع (Payment Status)'
+            'كود المدرسة',
+            'كود الطالب',
+            'الاسم الكامل',
+            'الهوية الوطنية',
+            'الجنس',
+            'تاريخ الميلاد',
+            'الجنسية',
+            'إمارة الإقامة',
+            'الصف',
+            'الشعبة',
+            'اسم ولي الأمر',
+            'رقم هاتف ولي الأمر'
         ));
 
-        // Sample Row matching 30 Fields
-        fputcsv($output, array(
-            'STU-1001',
-            '',
-            'علي أحمد عبدالله',
-            'ذكر',
-            '2015-05-12',
-            'الإمارات العربية المتحدة',
-            '784199012345678',
-            'الصف الخامس',
-            'أ',
-            '2026-2027',
-            '1',
-            'أحمد عبدالله علي',
-            'أب',
-            'parent@example.com',
-            '+971 501234567',
-            'Active',
-            'Enrolled',
-            date('Y-m-d'),
-            'أبوظبي',
-            'الرياض، الشارع الخامس',
-            'طالب متفوق ومواظب',
-            'ممتاز',
-            'لا',
-            'سليم',
-            'لا توجد حساسية',
-            '',
-            'Paid',
-            '15000.00',
-            '15000.00',
-            '0.00',
-            'Paid'
-        ));
+        // Official Sample Rows
+        fputcsv($output, array('1', 'STU-1001', 'أحمد علي حسن', '784199012345678', 'ذكر', '2015-05-12', 'الإمارات العربية المتحدة', 'الشارقة', '10', '1', 'علي حسن', '+971501234567'));
+        fputcsv($output, array('1', 'STU-1002', 'مريم خالد عمر', '784199298765432', 'أنثى', '2016-08-20', 'الإمارات العربية المتحدة', 'الشارقة', '10', '2', 'خالد عمر', '+971509876543'));
 
         fclose($output);
         exit;
@@ -7934,72 +7839,82 @@ class SM_Public {
                 }
             }
 
-            // Support 30-Column Comprehensive Format, 16-Column Export format, and 11-Column Template format
-            if (count($data) >= 28) {
-                // 30-Column Comprehensive Format
-                $row_data = array(
-                    'student_code'          => isset($data[0]) ? trim($data[0]) : '',
-                    'id'                    => is_numeric($data[1]) ? intval($data[1]) : 0,
-                    'name'                  => isset($data[2]) ? trim($data[2]) : '',
-                    'gender'                => isset($data[3]) ? trim($data[3]) : 'ذكر',
-                    'dob'                   => isset($data[4]) ? trim($data[4]) : '',
-                    'nationality'           => isset($data[5]) ? trim($data[5]) : 'الإمارات العربية المتحدة',
-                    'national_id'           => isset($data[6]) ? trim($data[6]) : '',
-                    'class_name'            => isset($data[7]) ? trim($data[7]) : '',
-                    'section'               => isset($data[8]) ? trim($data[8]) : '',
-                    'school_id'             => isset($data[10]) ? trim($data[10]) : '',
-                    'guardian_name'         => isset($data[11]) ? trim($data[11]) : '',
-                    'guardian_relationship' => isset($data[12]) ? trim($data[12]) : 'أب',
-                    'parent_email'          => isset($data[13]) ? trim($data[13]) : '',
-                    'guardian_phone'        => isset($data[14]) ? trim($data[14]) : '',
-                    'student_status'        => isset($data[15]) ? trim($data[15]) : 'Active',
-                    'enrollment_status'     => isset($data[16]) ? trim($data[16]) : 'Enrolled',
-                    'enrollment_date'       => isset($data[17]) ? trim($data[17]) : date('Y-m-d'),
-                    'emirate'               => isset($data[18]) ? trim($data[18]) : 'الشارقة',
-                    'address'               => isset($data[19]) ? trim($data[19]) : '',
-                    'student_behavior'      => isset($data[20]) ? trim($data[20]) : '',
-                    'academic_level'        => isset($data[21]) ? trim($data[21]) : 'ممتاز',
-                    'special_needs'         => isset($data[22]) ? trim($data[22]) : 'No',
-                    'health_status'         => isset($data[23]) ? trim($data[23]) : 'سليم',
-                    'allergies'             => isset($data[24]) ? trim($data[24]) : 'لا توجد حساسية',
-                    'photo_url'             => isset($data[25]) ? trim($data[25]) : '',
-                    'fee_status'            => isset($data[26]) ? trim($data[26]) : 'Unpaid',
-                    'total_tuition_fees'    => is_numeric($data[27] ?? '') ? floatval($data[27]) : 0,
-                    'amount_paid'           => is_numeric($data[28] ?? '') ? floatval($data[28]) : 0,
-                    'payment_status'        => isset($data[30]) ? trim($data[30]) : 'Pending'
-                );
-            } elseif (count($data) >= 15 && is_numeric($data[1]) && !empty($data[2])) {
-                // 16-Column Export Format
-                $row_data = array(
-                    'student_code'   => isset($data[0]) ? trim($data[0]) : '',
-                    'id'             => intval($data[1]),
-                    'name'           => isset($data[2]) ? trim($data[2]) : '',
-                    'national_id'    => !empty($data[3]) ? trim($data[3]) : '',
-                    'class_name'     => isset($data[4]) ? trim($data[4]) : '',
-                    'section'        => isset($data[5]) ? trim($data[5]) : '',
-                    'nationality'    => isset($data[6]) ? trim($data[6]) : '',
-                    'dob'            => isset($data[7]) ? trim($data[7]) : '',
-                    'gender'         => isset($data[8]) ? trim($data[8]) : '',
-                    'parent_email'   => isset($data[10]) ? trim($data[10]) : '',
-                    'guardian_phone' => isset($data[11]) ? trim($data[11]) : '',
-                    'photo_url'      => isset($data[13]) ? trim($data[13]) : '',
-                    'school_id'      => isset($data[14]) ? trim($data[14]) : ''
-                );
-            } else {
-                // 11 Official Columns
-                $row_data = array(
-                    'student_code'   => isset($data[0]) ? trim($data[0]) : '',
-                    'name'           => isset($data[1]) ? trim($data[1]) : '',
-                    'national_id'    => isset($data[2]) ? trim($data[2]) : '',
-                    'class_name'     => isset($data[3]) ? trim($data[3]) : '',
-                    'section'        => isset($data[4]) ? trim($data[4]) : '',
-                    'nationality'    => isset($data[5]) ? trim($data[5]) : '',
-                    'parent_email'   => isset($data[7]) ? trim($data[7]) : '',
-                    'guardian_phone' => isset($data[8]) ? trim($data[8]) : '',
-                    'photo_url'      => isset($data[9]) ? trim($data[9]) : '',
-                    'school_id'      => isset($data[10]) ? trim($data[10]) : ''
-                );
+            // Standard 12-Column Format Validation & Parsing
+            // Col 1: School Code, Col 2: Student Code, Col 3: Full Name, Col 4: National ID,
+            // Col 5: Gender, Col 6: DOB, Col 7: Nationality, Col 8: Emirate,
+            // Col 9: Grade, Col 10: Section, Col 11: Guardian Name, Col 12: Guardian Phone
+
+            if (count($data) < 12) {
+                $results['error']++;
+                $results['details'][] = array('type' => 'error', 'msg' => "السطر $row_index: يحتوي على " . count($data) . " عموداً فقط. يجب أن يتضمن ملف الاستيراد 12 عموداً بالترتيب المعتمد.");
+                continue;
             }
+
+            $school_code_input   = trim($data[0] ?? '');
+            $student_code_input  = trim($data[1] ?? '');
+            $name_input          = trim($data[2] ?? '');
+            $national_id_input   = trim($data[3] ?? '');
+            $gender_input        = trim($data[4] ?? 'ذكر');
+            $dob_input           = trim($data[5] ?? '');
+            $nationality_input  = trim($data[6] ?? 'الإمارات العربية المتحدة');
+            $emirate_input       = trim($data[7] ?? 'الشارقة');
+            $grade_input         = trim($data[8] ?? '');
+            $section_input       = trim($data[9] ?? '');
+            $guardian_name_input = trim($data[10] ?? '');
+            $guardian_phone_input= trim($data[11] ?? '');
+
+            // 1. Validate School Code against registered institutions/schools
+            global $wpdb;
+            $inst_match = null;
+            if (!empty($school_code_input)) {
+                if (is_numeric($school_code_input)) {
+                    $inst_code = intval($school_code_input);
+                    $inst_match = $wpdb->get_row($wpdb->prepare("SELECT id, code, name FROM {$wpdb->prefix}eess_institutions WHERE code = %d OR id = %d LIMIT 1", $inst_code, $inst_code));
+                    if (!$inst_match) {
+                        $inst_match = $wpdb->get_row($wpdb->prepare("SELECT id, school_code as code, name FROM {$wpdb->prefix}eess_schools WHERE school_code = %d OR id = %d LIMIT 1", $inst_code, $inst_code));
+                    }
+                } else {
+                    $inst_match = $wpdb->get_row($wpdb->prepare("SELECT id, code, name FROM {$wpdb->prefix}eess_institutions WHERE name = %s OR code = %s LIMIT 1", $school_code_input, $school_code_input));
+                }
+            }
+
+            if (!empty($school_code_input) && !$inst_match) {
+                $results['error']++;
+                $results['details'][] = array('type' => 'error', 'msg' => "السطر $row_index: كود المدرسة '{$school_code_input}' غير صحيح أو غير مسجل بالنظام.");
+                continue;
+            }
+
+            // 2. Validate Student Full Name
+            if (empty($name_input)) {
+                $results['error']++;
+                $results['details'][] = array('type' => 'error', 'msg' => "السطر $row_index: اسم الطالب مفقود ولا يمكن استيراد البيانات بدون الاسم.");
+                continue;
+            }
+
+            // 3. Validate Grade Code
+            if (is_numeric($grade_input)) {
+                $grade_num = intval($grade_input);
+                if ($grade_num < 1 || $grade_num > 12) {
+                    $results['error']++;
+                    $results['details'][] = array('type' => 'error', 'msg' => "السطر $row_index: كود الصف '{$grade_input}' غير صحيح (يجب أن يكون من 1 إلى 12).");
+                    continue;
+                }
+            }
+
+            $row_data = array(
+                'school_id'       => $inst_match ? $inst_match->id : 1,
+                'student_code'    => $student_code_input,
+                'name'            => $name_input,
+                'national_id'     => $national_id_input,
+                'gender'          => $gender_input,
+                'dob'             => $dob_input,
+                'nationality'     => $nationality_input,
+                'emirate'         => $emirate_input,
+                'class_name'      => $grade_input,
+                'section'         => $section_input,
+                'guardian_name'   => $guardian_name_input,
+                'guardian_phone'  => $guardian_phone_input
+            );
 
             $is_existing = false;
             $check_code = $row_data['student_code'] ?? '';

@@ -1255,7 +1255,15 @@ class EESS_Org_Helper {
             return self::$cache['institutions'];
         }
         global $wpdb;
+        $table = "{$wpdb->prefix}eess_institutions";
+        if ($wpdb->get_var("SHOW TABLES LIKE '$table'") !== $table) {
+            self::seed_mandatory_institutions();
+        }
         $res = $wpdb->get_results("SELECT i.*, u.display_name as manager_display_name FROM {$wpdb->prefix}eess_institutions i LEFT JOIN {$wpdb->users} u ON i.manager_id = u.ID WHERE (i.status = 'active' OR i.status IS NULL) ORDER BY CAST(i.code AS UNSIGNED) ASC, i.id ASC");
+        if (empty($res)) {
+            self::seed_mandatory_institutions();
+            $res = $wpdb->get_results("SELECT i.*, u.display_name as manager_display_name FROM {$wpdb->prefix}eess_institutions i LEFT JOIN {$wpdb->users} u ON i.manager_id = u.ID WHERE (i.status = 'active' OR i.status IS NULL) ORDER BY CAST(i.code AS UNSIGNED) ASC, i.id ASC");
+        }
         self::$cache['institutions'] = $res;
         return $res;
     }
