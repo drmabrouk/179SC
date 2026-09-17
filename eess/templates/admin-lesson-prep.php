@@ -2450,8 +2450,8 @@ if ($is_hod && !$is_admin && !$is_sys_admin) {
     $prep_report_submitted = $wpdb->get_results("SELECT p.*, u.display_name as teacher_name FROM {$wpdb->prefix}sm_lesson_preps p LEFT JOIN {$wpdb->users} u ON p.teacher_id = u.ID WHERE p.status IN ('submitted', 'approved', 'late') ORDER BY p.id DESC LIMIT 30");
 }
 
-$prep_report_inst = $wpdb->get_results("SELECT COALESCE((SELECT meta_value FROM {$wpdb->usermeta} WHERE user_id = p.teacher_id AND meta_key = 'eess_school_name'), 'خدمات الأنظمة الإلكترونية التعليمية') as inst, COUNT(*) as cnt FROM {$wpdb->prefix}sm_lesson_preps p GROUP BY inst ORDER BY cnt DESC");
-$prep_report_dept = $wpdb->get_results("SELECT COALESCE((SELECT meta_value FROM {$wpdb->usermeta} WHERE user_id = p.teacher_id AND meta_key = 'eess_department'), 'غير محدد') as dept, COUNT(*) as cnt FROM {$wpdb->prefix}sm_lesson_preps p GROUP BY dept ORDER BY cnt DESC");
+$prep_report_inst = $wpdb->get_results("SELECT COALESCE(um.meta_value, 'خدمات الأنظمة الإلكترونية التعليمية') as inst, COUNT(*) as cnt FROM {$wpdb->prefix}sm_lesson_preps p LEFT JOIN {$wpdb->usermeta} um ON p.teacher_id = um.user_id AND um.meta_key = 'eess_school_name' GROUP BY inst ORDER BY cnt DESC");
+$prep_report_dept = $wpdb->get_results("SELECT COALESCE(um.meta_value, 'غير محدد') as dept, COUNT(*) as cnt FROM {$wpdb->prefix}sm_lesson_preps p LEFT JOIN {$wpdb->usermeta} um ON p.teacher_id = um.user_id AND um.meta_key = 'eess_department' GROUP BY dept ORDER BY cnt DESC");
 $prep_report_subject = $wpdb->get_results("SELECT subject as name, COUNT(*) as cnt FROM {$wpdb->prefix}sm_lesson_preps GROUP BY subject ORDER BY cnt DESC");
 
 $prep_report_daily = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}sm_lesson_preps WHERE DATE(lesson_date) = CURDATE()") ?: 0;
@@ -2545,11 +2545,14 @@ $prep_report_total_late = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}sm
                 $tab_non_submitters = array();
                 $tab_compliant_teachers = array();
 
+                $all_preps_batch = $wpdb->get_results("SELECT teacher_id, lesson_date, created_at FROM {$wpdb->prefix}sm_lesson_preps WHERE status IN ('submitted', 'approved', 'resubmitted', 'late')");
+                $preps_by_teacher = array();
+                foreach ($all_preps_batch as $ap) {
+                    $preps_by_teacher[$ap->teacher_id][] = $ap;
+                }
+
                 foreach ($prep_report_teachers as $t) {
-                    $t_preps = $wpdb->get_results($wpdb->prepare(
-                        "SELECT * FROM {$wpdb->prefix}sm_lesson_preps WHERE teacher_id = %d AND status IN ('submitted', 'approved', 'resubmitted', 'late')",
-                        $t->ID
-                    ));
+                    $t_preps = $preps_by_teacher[$t->ID] ?? array();
 
                     $sub_weeks = array();
                     foreach ($t_preps as $p) {

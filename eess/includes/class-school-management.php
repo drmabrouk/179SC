@@ -92,7 +92,6 @@ class School_Management {
         $this->loader->add_action('wp_ajax_sm_add_document_ajax', $plugin_public, 'ajax_add_document');
         $this->loader->add_action('wp_ajax_sm_update_document_ajax', $plugin_public, 'ajax_update_document');
         $this->loader->add_action('wp_ajax_sm_delete_document_ajax', $plugin_public, 'ajax_delete_document');
-        $this->loader->add_action('wp_ajax_sm_add_assignment_ajax', $plugin_public, 'ajax_add_assignment');
         $this->loader->add_action('wp_ajax_sm_approve_plan_ajax', $plugin_public, 'ajax_approve_plan');
         $this->loader->add_action('wp_ajax_sm_bulk_delete_users_ajax', $plugin_public, 'ajax_bulk_delete_users');
         $this->loader->add_action('wp_ajax_sm_add_clinic_referral', $plugin_public, 'ajax_add_clinic_referral');
@@ -161,8 +160,6 @@ class School_Management {
         $this->loader->add_action('wp_ajax_sm_delete_term_plan', $plugin_public, 'ajax_delete_term_plan');
 
         // Print / PDF action
-        $this->loader->add_action('wp_ajax_sm_save_asset_inventory', $plugin_public, 'ajax_sm_save_asset_inventory');
-        $this->loader->add_action('wp_ajax_sm_save_asset_request', $plugin_public, 'ajax_sm_save_asset_request');
         $this->loader->add_action('wp_ajax_sm_mark_teacher_contacted', $plugin_public, 'ajax_sm_mark_teacher_contacted');
         $this->loader->add_action('wp_ajax_sm_assign_term_plan', $plugin_public, 'ajax_sm_assign_term_plan');
         $this->loader->add_action('wp_ajax_sm_assign_lesson_prep', $plugin_public, 'ajax_sm_assign_lesson_prep');
@@ -226,8 +223,6 @@ class School_Management {
         $this->loader->add_action('wp_ajax_nopriv_sm_public_submit_exit_card', $plugin_public, 'ajax_public_submit_exit_card');
 
         // Organizational Sub-Tab AJAX Actions
-        $this->loader->add_action('wp_ajax_eess_save_department', $plugin_public, 'ajax_eess_save_department');
-        $this->loader->add_action('wp_ajax_eess_delete_department', $plugin_public, 'ajax_eess_delete_department');
         $this->loader->add_action('wp_ajax_eess_save_subject', $plugin_public, 'ajax_eess_save_subject');
         $this->loader->add_action('wp_ajax_eess_save_grade', $plugin_public, 'ajax_eess_save_grade');
     }

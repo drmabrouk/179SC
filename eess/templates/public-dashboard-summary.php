@@ -80,14 +80,14 @@ $dash_data = SM_DB::get_personalized_dashboard_data($user_id);
         </div>
 
         <!-- 3. Tasks Awaiting Evaluation Card -->
-        <a href="<?php echo add_query_arg('sm_tab', 'assignments'); ?>" style="text-decoration: none; background: #ffffff; border-radius: 16px; padding: 20px; border: 1px solid #cbd5e1; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border-top: 4px solid #f59e0b; display: block;">
+        <a href="<?php echo add_query_arg('sm_tab', 'lesson-plans'); ?>" style="text-decoration: none; background: #ffffff; border-radius: 16px; padding: 20px; border: 1px solid #cbd5e1; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border-top: 4px solid #f59e0b; display: block;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <span style="font-size: 12px; font-weight: 800; color: #64748b;">مهام بانتظار التقييم والمراجعة</span>
+                <span style="font-size: 12px; font-weight: 800; color: #64748b;">تحضيرات بانتظار المراجعة والاعتماد</span>
                 <span class="dashicons dashicons-welcome-write-blog" style="color: #f59e0b; font-size: 18px;"></span>
             </div>
             <?php $tasks = $dash_data['tasks_eval'] ?? array('total' => 0, 'pending_homework' => 0, 'pending_preps' => 0); ?>
-            <div style="font-size: 28px; font-weight: 900; color: #d97706; line-height: 1; margin-bottom: 6px;"><?php echo $tasks['total']; ?></div>
-            <div style="font-size: 11px; color: #64748b;">واجبات سريعة وتحضيرات بانتظار مراجعتك</div>
+            <div style="font-size: 28px; font-weight: 900; color: #d97706; line-height: 1; margin-bottom: 6px;"><?php echo $tasks['pending_preps']; ?></div>
+            <div style="font-size: 11px; color: #64748b;">تحضيرات دروس بانتظار مراجعتك والاعتماد</div>
         </a>
 
         <!-- 4. Academic Alerts Card -->
@@ -116,9 +116,9 @@ $dash_data = SM_DB::get_personalized_dashboard_data($user_id);
                 <span class="dashicons dashicons-welcome-write-blog" style="font-size: 15px; width: 15px; height: 15px;"></span>
                 <span>رصد درجات / تقييم جديد</span>
             </a>
-            <a href="<?php echo add_query_arg('sm_tab', 'assignments'); ?>" class="sm-btn" style="height: 38px; padding: 0 18px; font-size: 12.5px; background: #475569; color: #ffffff !important; border-radius: 9999px !important; font-weight: 800; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+            <a href="<?php echo add_query_arg('sm_tab', 'lesson-plans'); ?>" class="sm-btn" style="height: 38px; padding: 0 18px; font-size: 12.5px; background: #475569; color: #ffffff !important; border-radius: 9999px !important; font-weight: 800; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
                 <span class="dashicons dashicons-edit" style="font-size: 15px; width: 15px; height: 15px;"></span>
-                <span>إضافة واجب / تكليف</span>
+                <span>إعداد تحضير جديد</span>
             </a>
             <button type="button" onclick="eessOpenQuickParentNoteModal()" class="sm-btn" style="height: 38px; padding: 0 20px; font-size: 12.5px; background: #881337; color: #ffffff !important; border-radius: 9999px !important; font-weight: 800; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
                 <span class="dashicons dashicons-email-alt" style="font-size: 15px; width: 15px; height: 15px;"></span>

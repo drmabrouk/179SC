@@ -356,9 +356,7 @@ class EESS_Student_Data_Service {
             }
         }
 
-        // Invalidate transient & object caches to ensure immediate data updates
-        $wpdb->query("DELETE FROM {$wpdb->prefix}options WHERE option_name LIKE '_transient_sm_%' OR option_name LIKE '_transient_timeout_sm_%'");
-        $wpdb->query("DELETE FROM {$wpdb->prefix}options WHERE option_name LIKE '_transient_eess_%' OR option_name LIKE '_transient_timeout_eess_%'");
+        // Invalidate object cache cleanly
         wp_cache_flush();
 
         if ($final_id > 0) {

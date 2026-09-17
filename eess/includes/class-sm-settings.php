@@ -449,45 +449,6 @@ class SM_Settings {
                     'sm_hr' => false,
                 )
             ),
-            'assets' => array(
-                'label' => 'إدارة العهد والمعدات',
-                'dashicon' => 'dashicons-store',
-                'tab' => 'assets',
-                'default' => array(
-                    'sm_system_admin' => true,
-                    'sm_principal' => true,
-                    'sm_supervisor' => true,
-                    'sm_coordinator' => true,
-                    'sm_hod' => true,
-                    'sm_teacher' => true,
-                    'sm_student' => false,
-                    'sm_parent' => false,
-                    'sm_discipline_supervisor' => false,
-                    'sm_activities_supervisor' => true,
-                    'sm_transportation_supervisor' => true,
-                    'sm_bus_supervisor' => false,
-                    'sm_hr' => false,
-                )
-            ),
-            'assignments' => array(
-                'label' => 'الواجبات المدرسية',
-                'dashicon' => 'dashicons-portfolio',
-                'tab' => 'assignments',
-                'default' => array(
-                    'sm_system_admin' => true,
-                    'sm_principal' => false,
-                    'sm_supervisor' => false,
-                    'sm_coordinator' => false,
-                    'sm_teacher' => true,
-                    'sm_student' => true,
-                    'sm_parent' => false,
-                    'sm_discipline_supervisor' => false,
-                    'sm_activities_supervisor' => false,
-                    'sm_transportation_supervisor' => false,
-                    'sm_bus_supervisor' => false,
-                    'sm_hr' => false,
-                )
-            ),
             'attendance' => array(
                 'label' => 'سجل الحضور والغياب',
                 'dashicon' => 'dashicons-calendar-alt',
@@ -663,25 +624,6 @@ class SM_Settings {
                     'sm_hr' => false,
                 )
             ),
-            'school-structure' => array(
-                'label' => 'الهيكل التنظيمي والاداري',
-                'dashicon' => 'dashicons-category',
-                'tab' => 'school-structure',
-                'default' => array(
-                    'sm_system_admin' => true,
-                    'sm_principal' => false,
-                    'sm_supervisor' => false,
-                    'sm_coordinator' => false,
-                    'sm_teacher' => false,
-                    'sm_student' => false,
-                    'sm_parent' => false,
-                    'sm_discipline_supervisor' => false,
-                    'sm_activities_supervisor' => false,
-                    'sm_transportation_supervisor' => false,
-                    'sm_bus_supervisor' => false,
-                    'sm_hr' => false,
-                )
-            ),
             'global-settings' => array(
                 'label' => 'إعدادات النظام',
                 'dashicon' => 'dashicons-admin-generic',
@@ -751,7 +693,7 @@ class SM_Settings {
             return true;
         }
 
-        if ($key === 'school-structure' || $key === 'global-settings') {
+        if ($key === 'global-settings') {
             return false;
         }
 
@@ -930,7 +872,6 @@ class SM_Settings {
             'sm_delete_term_plan' => 'term-plans',
 
             // Assignments
-            'sm_add_assignment_ajax' => 'assignments',
             'sm_approve_plan_ajax' => 'assignments',
 
             // Documents
@@ -1105,9 +1046,6 @@ class SM_Settings {
         update_user_meta($user_id, 'eess_hr_activity_timeline', $timeline);
 
         // 5. Invalidate caches immediately so that the new role, permissions, and sidebar appear instantly
-        global $wpdb;
-        $wpdb->query("DELETE FROM {$wpdb->prefix}options WHERE option_name LIKE '_transient_sm_%' OR option_name LIKE '_transient_timeout_sm_%'");
-        $wpdb->query("DELETE FROM {$wpdb->prefix}options WHERE option_name LIKE '_transient_eess_%' OR option_name LIKE '_transient_timeout_eess_%'");
         wp_cache_flush();
         clean_user_cache($user_id);
 

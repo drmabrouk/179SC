@@ -72,7 +72,84 @@ class SM_DB {
         }
 
         $query .= " ORDER BY sort_order ASC, name ASC";
+
+        if (isset($filters['limit']) && intval($filters['limit']) > 0) {
+            $limit_val = intval($filters['limit']);
+            $offset_val = isset($filters['offset']) ? intval($filters['offset']) : 0;
+            $query .= $wpdb->prepare(" LIMIT %d OFFSET %d", $limit_val, $offset_val);
+        }
+
         return $wpdb->get_results($query);
+    }
+
+    public static function get_students_count($filters = array()) {
+        global $wpdb;
+        $user = wp_get_current_user();
+        $is_teacher = in_array('sm_teacher', (array)$user->roles);
+        $is_supervisor = in_array('sm_supervisor', (array)$user->roles);
+
+        $scope_filter = EESS_Org_Helper::filter_students_query();
+        $query = "SELECT COUNT(*) FROM {$wpdb->prefix}sm_students WHERE " . $scope_filter;
+
+        $is_searching = !empty($filters['search']);
+
+        if ($is_teacher && !current_user_can('manage_options') && !$is_searching) {
+            $assigned = get_user_meta($user->ID, 'sm_assigned_sections', true);
+            if (is_array($assigned) && !empty($assigned)) {
+                $clauses = array();
+                foreach($assigned as $pair) {
+                    list($g, $s) = explode('|', $pair);
+                    $clauses[] = $wpdb->prepare("(class_name = %s AND section = %s)", 'الصف '.$g, $s);
+                }
+                $query .= " AND (" . implode(" OR ", $clauses) . ")";
+            }
+        }
+
+        if ($is_supervisor && !current_user_can('manage_options') && !$is_searching) {
+            $supervised = get_user_meta($user->ID, 'sm_supervised_classes', true);
+            if (is_array($supervised) && !empty($supervised)) {
+                $clauses = array();
+                foreach($supervised as $pair) {
+                    list($g, $s) = explode('|', $pair);
+                    $clauses[] = $wpdb->prepare("(class_name = %s AND section = %s)", 'الصف '.$g, $s);
+                }
+                $query .= " AND (" . implode(" OR ", $clauses) . ")";
+            }
+        }
+
+        if (!empty($filters['search'])) {
+            $search_str = trim($filters['search']);
+            $clean_serial = preg_replace('/[^0-9]/', '', $search_str);
+            $normalized_search = self::normalize_arabic($search_str);
+            $search_like = '%' . $wpdb->esc_like($normalized_search) . '%';
+            $name_sql = self::get_arabic_normalized_column('name');
+
+            if (is_numeric($search_str) || preg_match('/^(SN-|STU-|ST)[0-9]+$/i', $search_str)) {
+                $query .= $wpdb->prepare(" AND (student_code = %s OR id = %d OR student_code = %s OR $name_sql LIKE %s OR national_id = %s)", $search_str, intval($clean_serial), $clean_serial, $search_like, $search_str);
+            } else {
+                $query .= $wpdb->prepare(" AND ($name_sql LIKE %s OR student_code LIKE %s OR national_id LIKE %s OR guardian_phone LIKE %s OR class_name LIKE %s OR section LIKE %s)", $search_like, $search_like, $search_like, $search_like, $search_like, $search_like);
+            }
+        }
+
+        if (!empty($filters['class_name'])) {
+            $query .= $wpdb->prepare(" AND class_name = %s", $filters['class_name']);
+        }
+
+        if (!empty($filters['section'])) {
+            $query .= $wpdb->prepare(" AND section = %s", $filters['section']);
+        }
+
+        if (!empty($filters['teacher_id']) && !empty($filters['include_reported'])) {
+            $tid = intval($filters['teacher_id']);
+            $query .= $wpdb->prepare(" AND (teacher_id = %d OR id IN (SELECT DISTINCT student_id FROM {$wpdb->prefix}sm_records WHERE teacher_id = %d))", $tid, $tid);
+        } elseif (!empty($filters['teacher_id'])) {
+            $query .= $wpdb->prepare(" AND teacher_id = %d", $filters['teacher_id']);
+        } elseif (!empty($filters['only_reported_by_teacher'])) {
+            $teacher_id = intval($filters['only_reported_by_teacher']);
+            $query .= $wpdb->prepare(" AND id IN (SELECT DISTINCT student_id FROM {$wpdb->prefix}sm_records WHERE teacher_id = %d)", $teacher_id);
+        }
+
+        return intval($wpdb->get_var($query) ?: 0);
     }
 
     public static function get_next_sort_order() {
@@ -792,16 +869,6 @@ class SM_DB {
             'created_at' => current_time('mysql')
         ));
 
-        // Also record in sm_assignments for backwards compatibility
-        $wpdb->insert("{$wpdb->prefix}sm_assignments", array(
-            'sender_id' => intval($sender_id),
-            'receiver_id' => intval($receiver_id),
-            'student_id' => $student_id ? intval($student_id) : null,
-            'title' => 'رسالة / استفسار جديد',
-            'description' => sanitize_textarea_field($message),
-            'type' => 'inquiry',
-            'created_at' => current_time('mysql')
-        ));
 
         return $inserted;
     }
@@ -1422,10 +1489,7 @@ class SM_DB {
             );
 
             // Tasks Awaiting Evaluation
-            $pending_homework = $wpdb->get_var($wpdb->prepare(
-                "SELECT COUNT(*) FROM {$wpdb->prefix}sm_assignments WHERE sender_id = %d",
-                $user_id
-            )) ?: 0;
+            $pending_homework = 0;
 
             $pending_preps = $wpdb->get_var($wpdb->prepare(
                 "SELECT COUNT(*) FROM {$wpdb->prefix}sm_lesson_preps WHERE teacher_id = %d AND status = 'draft'",
