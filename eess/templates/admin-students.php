@@ -298,8 +298,38 @@ $to_num = min($offset + $limit, $total_students_count);
                 <span id="import-status-text">جاري تحليل ومعالجة ملف الاستيراد...</span>
                 <span id="import-percentage">0%</span>
             </div>
-            <div style="background:#edf2f7; border-radius:50px; height:12px; overflow:hidden;">
+            <div style="background:#edf2f7; border-radius:50px; height:12px; overflow:hidden; margin-bottom: 15px;">
                 <div id="import-progress-bar" style="background:#881337; width:0%; height:100%; transition:0.3s;"></div>
+            </div>
+
+            <!-- Real-Time Live Import Counters -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; text-align: center; font-size: 12px; font-weight: 700; margin-bottom: 15px;">
+                <div style="background: #f1f5f9; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1;">
+                    <div style="font-size: 11px; color: #64748b;">إجمالي السجلات</div>
+                    <div id="imp-stat-total" style="font-size: 18px; color: #0f172a; font-weight: 800;">0</div>
+                </div>
+                <div style="background: #f0fdf4; padding: 10px; border-radius: 8px; border: 1px solid #bbf7d0;">
+                    <div style="font-size: 11px; color: #166534;">تم استيرادها</div>
+                    <div id="imp-stat-success" style="font-size: 18px; color: #16a34a; font-weight: 800;">0</div>
+                </div>
+                <div style="background: #eff6ff; padding: 10px; border-radius: 8px; border: 1px solid #bfdbfe;">
+                    <div style="font-size: 11px; color: #1e40af;">محدّثة</div>
+                    <div id="imp-stat-duplicate" style="font-size: 18px; color: #2563eb; font-weight: 800;">0</div>
+                </div>
+                <div style="background: #fef2f2; padding: 10px; border-radius: 8px; border: 1px solid #fecdd3;">
+                    <div style="font-size: 11px; color: #991b1b;">مستبعدة / خطأ</div>
+                    <div id="imp-stat-error" style="font-size: 18px; color: #dc2626; font-weight: 800;">0</div>
+                </div>
+            </div>
+
+            <!-- Detailed Log Area for Errors / Warnings -->
+            <div id="imp-details-box" style="display: none; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; max-height: 180px; overflow-y: auto; font-size: 11.5px; line-height: 1.6;">
+                <div style="font-weight: 800; color: #334155; margin-bottom: 6px;">سجل تفاصيل المعالجة:</div>
+                <ul id="imp-details-list" style="margin: 0; padding-right: 18px; color: #475569;"></ul>
+            </div>
+
+            <div id="imp-finish-actions" style="display: none; margin-top: 15px; text-align: left;">
+                <button type="button" onclick="location.reload()" class="sm-btn" style="background: #16a34a; color: white !important; font-size: 12px; padding: 8px 20px; font-weight: 800; border-radius: 9999px;">تحديث الصفحة وعرض قائمة الطلاب ←</button>
             </div>
         </div>
     </div>
@@ -1098,6 +1128,8 @@ $to_num = min($offset + $limit, $total_students_count);
         uploadNextChunk();
     };
 
+    let totalDetectedRows = 0;
+
     function uploadNextChunk() {
         const start = chunkedCurrentPart * CHUNK_SIZE;
         const end = Math.min(start + CHUNK_SIZE, chunkedSize);
@@ -1112,15 +1144,21 @@ $to_num = min($offset + $limit, $total_students_count);
         .then(r => r.json())
         .then(res => {
             if (res.success) {
-                processImportChunk(res.data.file_path, 0);
+                totalDetectedRows = res.data.total || 0;
+                document.getElementById('imp-stat-total').innerText = totalDetectedRows;
+                processImportChunk(res.data.file_path, 0, 0);
             } else {
-                alert('فشل رفع الملف: ' + res.data);
+                alert('فشل رفع الملف: ' + (res.data || 'خطأ غير معروف'));
                 resetImportUI();
             }
+        })
+        .catch(err => {
+            alert('حدث خطأ في الاتصال أثناء رفع الملف.');
+            resetImportUI();
         });
     }
 
-    function processImportChunk(filePath, offset) {
+    function processImportChunk(filePath, offset, retryCount = 0) {
         const formData = new FormData();
         formData.append('action', 'sm_process_import_chunk');
         formData.append('file_path', filePath);
@@ -1132,19 +1170,55 @@ $to_num = min($offset + $limit, $total_students_count);
         .then(res => {
             if (res.success) {
                 const finished = res.data.finished;
-                const processed = res.data.total_so_far;
+                const totalRows = res.data.total_rows || totalDetectedRows;
+                const processedSoFar = res.data.processed_so_far || 0;
+
+                // Live Stats Update
+                document.getElementById('imp-stat-total').innerText = totalRows;
+                document.getElementById('imp-stat-success').innerText = res.data.success || 0;
+                document.getElementById('imp-stat-duplicate').innerText = res.data.duplicate || 0;
+                document.getElementById('imp-stat-error').innerText = res.data.error || 0;
+
+                // Live Log Update
+                if (res.data.details && res.data.details.length > 0) {
+                    const box = document.getElementById('imp-details-box');
+                    const list = document.getElementById('imp-details-list');
+                    box.style.display = 'block';
+                    list.innerHTML = '';
+                    res.data.details.forEach(item => {
+                        const li = document.createElement('li');
+                        li.style.color = item.type === 'error' ? '#dc2626' : '#2563eb';
+                        li.innerText = item.msg;
+                        list.appendChild(li);
+                    });
+                }
+
+                const pct = totalRows > 0 ? Math.min(100, Math.round((processedSoFar / totalRows) * 100)) : 0;
 
                 if (finished) {
-                    updateImportProgress('تم الانتهاء من استيراد كافة البيانات بنجاح!', 100);
-                    setTimeout(() => location.reload(), 1500);
+                    updateImportProgress('تم الانتهاء من استيراد ومعالجة كافة سجلات الملف!', 100);
+                    document.getElementById('imp-finish-actions').style.display = 'block';
                 } else {
-                    const pct = Math.min(99, Math.round((offset / chunkedTotalParts) * 100));
-                    updateImportProgress(`جاري معالجة السجلات... تم معالجة ${processed} طالب`, pct);
-                    processImportChunk(filePath, offset + res.data.processed);
+                    updateImportProgress(`جاري معالجة الدفعة... تم معالجة ${processedSoFar} من أصل ${totalRows} طالب`, pct);
+                    processImportChunk(filePath, processedSoFar, 0);
                 }
             } else {
-                alert('خطأ أثناء المعالجة: ' + res.data);
-                resetImportUI();
+                if (retryCount < 3) {
+                    updateImportProgress(`إعادة محاولة الاتصال بالخادم... (محاولة ${retryCount + 1}/3)`, Math.min(99, Math.round((offset / Math.max(1, totalDetectedRows)) * 100)));
+                    setTimeout(() => processImportChunk(filePath, offset, retryCount + 1), 1500);
+                } else {
+                    alert('خطأ أثناء معالجة الدفعة: ' + (res.data || 'استجابة غير متوقعة من الخادم'));
+                    document.getElementById('imp-finish-actions').style.display = 'block';
+                }
+            }
+        })
+        .catch(err => {
+            if (retryCount < 3) {
+                updateImportProgress(`خطأ مؤقت في الاتصال، جاري إعادة المحاولة... (${retryCount + 1}/3)`, Math.min(99, Math.round((offset / Math.max(1, totalDetectedRows)) * 100)));
+                setTimeout(() => processImportChunk(filePath, offset, retryCount + 1), 1500);
+            } else {
+                alert('تعذر الاتصال بالخادم بعد عدة محاولات.');
+                document.getElementById('imp-finish-actions').style.display = 'block';
             }
         });
     }
