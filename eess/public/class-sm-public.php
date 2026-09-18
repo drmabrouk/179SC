@@ -13875,15 +13875,16 @@ class SM_Public {
     public function ajax_public_search_student() {
         $name_query = sanitize_text_field($_POST['name_query'] ?? '');
         $clean_query = trim($name_query);
+        $words = array_values(array_filter(explode(' ', $clean_query)));
 
-        if (mb_strlen($clean_query) < 1) {
-            wp_send_json_error('يرجى إدخال اسم الطالب للبحث.');
+        // Only search when at least 3 words (complete full name) are typed
+        if (count($words) < 3) {
+            wp_send_json_error('يرجى إدخال اسم الطالب الكامل (الثلاثي على الأقل) لإظهار نتائج البحث.');
         }
 
         global $wpdb;
         $norm_query = self::normalize_arabic_str($clean_query);
 
-        $words = array_filter(explode(' ', $clean_query));
         $where = array();
         $params = array();
 
