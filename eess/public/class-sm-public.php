@@ -8041,6 +8041,12 @@ class SM_Public {
         $inst = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}eess_institutions WHERE id = %d LIMIT 1", $inst_id));
         if (!$inst) wp_send_json_error('المؤسسة غير موجودة.');
 
+        // Clean up associated exit card requests for students in this institution
+        $wpdb->query($wpdb->prepare(
+            "DELETE FROM {$wpdb->prefix}sm_exit_card_requests WHERE student_id IN (SELECT id FROM {$wpdb->prefix}sm_students WHERE institution_id = %d OR school_id = %d)",
+            $inst_id, $inst_id
+        ));
+
         $deleted = $wpdb->query($wpdb->prepare(
             "DELETE FROM {$wpdb->prefix}sm_students WHERE institution_id = %d OR school_id = %d",
             $inst_id, $inst_id
@@ -8049,7 +8055,7 @@ class SM_Public {
         SM_Logger::log('حذف طلاب مؤسسة', "قام مدير النظام بحذف ($deleted) طالب تابعين لمؤسسة: {$inst->name} (ID: {$inst_id})");
         wp_cache_flush();
 
-        wp_send_json_success(array('message' => "تم حذف $deleted طالب تابع لمؤسسة ({$inst->name}) بنجاح."));
+        wp_send_json_success(array('message' => "تم حذف $deleted طالب تابع لمؤسسة ({$inst->name}) وتطهير طلباتهم بنجاح."));
     }
 
     public function ajax_eess_admin_delete_all_students_global() {
@@ -8061,12 +8067,13 @@ class SM_Public {
 
         global $wpdb;
         $count = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}sm_students");
+        $wpdb->query("TRUNCATE TABLE {$wpdb->prefix}sm_exit_card_requests");
         $wpdb->query("TRUNCATE TABLE {$wpdb->prefix}sm_students");
 
-        SM_Logger::log('حذف كافة الطلاب الشامل', "قام مدير النظام بحذف كافة سجلات الطلاب لجميع المؤسسات ($count طالب)");
+        SM_Logger::log('حذف كافة الطلاب الشامل', "قام مدير النظام بحذف كافة سجلات الطلاب لجميع المؤسسات ($count طالب) وتطهير الطلبات القائمة");
         wp_cache_flush();
 
-        wp_send_json_success(array('message' => "تم حذف جميع سجلات الطلاب ($count طالب) لجميع المؤسسات بنجاح."));
+        wp_send_json_success(array('message' => "تم حذف جميع سجلات الطلاب ($count طالب) وجميع الطلبات لجميع المؤسسات بنجاح."));
     }
 
     public function ajax_eess_admin_reset_all_student_sequences_global() {
@@ -11377,6 +11384,101 @@ class SM_Public {
             </html>
             <?php
             exit;
+        } elseif ($print_type === 'exit_permit_request' || $print_type === 'exit_request_doc') {
+            global $wpdb;
+            $req_id = intval($_GET['request_id'] ?? 0);
+            if (!$req_id) wp_die('معرف طلب التصريح غير مدخل.');
+
+            $req = $wpdb->get_row($wpdb->prepare(
+                "SELECT r.*, s.name as student_name, s.student_code, s.class_name, s.section, s.national_id, s.photo_url FROM {$wpdb->prefix}sm_exit_card_requests r JOIN {$wpdb->prefix}sm_students s ON r.student_id = s.id WHERE r.id = %d",
+                $req_id
+            ));
+
+            if (!$req) wp_die('سجل الطلب غير موجود بالنظام.');
+
+            $school_info = SM_Settings::get_school_info();
+            $sys_logo = !empty($school_info['school_logo']) ? $school_info['school_logo'] : (!empty($school_info['logo_url']) ? $school_info['logo_url'] : SM_PLUGIN_URL . 'assets/images/logo.png');
+            $org_title = 'مؤسسة الشعلة للتعليم والتطوير';
+
+            header('Content-Type: text/html; charset=utf-8');
+            ?>
+            <!DOCTYPE html>
+            <html lang="ar" dir="rtl">
+            <head>
+                <meta charset="UTF-8">
+                <title>وثيقة طلب وتعهد تصريح خروج طالب رسمي - <?php echo esc_html($req->reference_no); ?></title>
+                <style>
+                    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800;900&display=swap');
+                    body { font-family: 'Cairo', sans-serif; direction: rtl; margin: 0; padding: 25px; background: #fff; color: #0f172a; font-size: 13px; line-height: 1.6; }
+                    .doc-box { max-width: 750px; margin: 0 auto; border: 2px solid #0f172a; border-radius: 16px; padding: 24px; box-sizing: border-box; }
+                    .doc-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0f172a; padding-bottom: 14px; margin-bottom: 20px; }
+                    .doc-title { font-size: 19px; font-weight: 900; color: #0f172a; margin: 0 0 4px 0; }
+                    .doc-sub { font-size: 13px; color: #881337; font-weight: 800; }
+                    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 12px; padding: 14px; margin-bottom: 20px; }
+                    .decl-box { background: #fffbe3; border: 1px solid #fde047; border-radius: 12px; padding: 16px; font-size: 12px; color: #854d0e; margin-bottom: 20px; line-height: 1.7; }
+                    .sig-area { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 30px; border-top: 1px solid #cbd5e1; padding-top: 16px; }
+                    @media print { @page { size: A4 portrait; margin: 15mm; } body { padding: 0; } .no-print { display: none !important; } }
+                </style>
+            </head>
+            <body>
+                <div class="no-print" style="text-align: center; margin-bottom: 20px;">
+                    <button onclick="window.print()" style="padding: 10px 28px; background: #881337; color: white; border: none; border-radius: 8px; font-weight: 900; font-size: 14px; cursor: pointer;">🖨️ طباعة وثيقة طلب التصريح (A4 Document)</button>
+                </div>
+
+                <div class="doc-box">
+                    <div class="doc-header">
+                        <div>
+                            <h1 class="doc-title"><?php echo esc_html($org_title); ?></h1>
+                            <div class="doc-sub">وثيقة طلب وتعهد تصريح خروج طالب رسمي</div>
+                            <div style="font-size: 11px; color: #64748b; font-weight: 700; margin-top: 4px;">الرقم المرجعي: <span style="font-family: monospace; color: #0f172a; font-weight: 900;"><?php echo esc_html($req->reference_no); ?></span></div>
+                        </div>
+                        <div>
+                            <img src="<?php echo esc_url($sys_logo); ?>" style="max-height: 70px; object-fit: contain;" alt="Logo">
+                        </div>
+                    </div>
+
+                    <div class="info-grid">
+                        <div><strong>اسم الطالب الكامل:</strong> <?php echo esc_html($req->student_name); ?></div>
+                        <div><strong>كود الطالب:</strong> <span style="font-family: monospace; color: #881337; font-weight: 900;"><?php echo esc_html($req->student_code); ?></span></div>
+                        <div><strong>الصف والشعبة:</strong> <?php echo esc_html($req->class_name); ?> (<?php echo esc_html($req->section); ?>)</div>
+                        <div><strong>رقم الهوية الوطنية:</strong> <?php echo esc_html($req->national_id ?: 'غير مدخلة'); ?></div>
+                        <div><strong>اسم ولي الأمر:</strong> <?php echo esc_html($req->parent_name); ?></div>
+                        <div><strong>هاتف التواصل:</strong> <?php echo esc_html($req->parent_phone); ?></div>
+                        <div><strong>تاريخ الطلب:</strong> <?php echo esc_html(date_i18n('Y-m-d H:i', strtotime($req->created_at))); ?></div>
+                        <div><strong>العام الدراسي:</strong> <?php echo esc_html($req->academic_year); ?></div>
+                    </div>
+
+                    <div class="decl-box">
+                        <strong>تعهد وإقرار ولي الأمر الرسمي المعتمد بالنظام:</strong><br>
+                        أقر أنا ولي أمر الطالب/ة المذكور/ة أعلاه بطلبي الرسمي لإصدار بطاقة تصريح خروج واستئذان. وأتحمل المسؤولية الكاملة عن خروج الطالب/ة خارج أسوار المدرسة بموجب هذا التصريح وإقرار بإخلاء طرف إدارة المدرسة وكوادرها الإدارية والتعليمية وفق الأنظمة المعتمدة.
+                    </div>
+
+                    <div class="sig-area">
+                        <div>
+                            <strong>التوقيع الإلكتروني المعتمد لولي الأمر:</strong><br>
+                            <?php if (!empty($req->signature_data)): ?>
+                                <img src="<?php echo esc_url($req->signature_data); ?>" style="max-height: 60px; object-fit: contain; border: 1px solid #cbd5e1; border-radius: 8px; padding: 4px; margin-top: 6px;" alt="Signature">
+                            <?php else: ?>
+                                <div style="font-size: 11px; color: #94a3b8; margin-top: 6px;">توقيع إلكتروني موثق برقم المرجع</div>
+                            <?php endif; ?>
+                        </div>
+                        <div style="text-align: left;">
+                            <div><strong>اعتماد إدارة شؤون الطلاب:</strong></div>
+                            <div style="margin-top: 10px; font-weight: 900; color: #166534;">✓ تم التدقيق والاعتماد بالنظام الإلكتروني</div>
+                            <div style="font-size: 10.5px; color: #64748b; margin-top: 4px;">تاريخ الاعتماد: <?php echo date_i18n('Y-m-d'); ?></div>
+                        </div>
+                    </div>
+                </div>
+
+                <script>
+                    if (window.location.search.indexOf('auto_print=1') !== -1) {
+                        window.print();
+                    }
+                </script>
+            </body>
+            </html>
+            <?php
+            exit;
         } else {
             wp_die('نوع الطباعة غير مدعوم.');
         }
@@ -14201,19 +14303,33 @@ class SM_Public {
             wp_send_json_error('بيانات الطالب غير صحيحة أو تم نقل الملف.');
         }
 
+        $settings = get_option('sm_exit_card_settings', array(
+            'portal_mode' => 'card_application',
+            'verify_method' => 'both',
+            'required_fields' => array('guardian_phone', 'dob'),
+            'max_requests' => 3,
+            'redirect_discipline' => 'yes'
+        ));
+
+        $verify_method = $settings['verify_method'] ?? 'both';
         $clean_input = strtolower(trim($verify_code));
         $stu_code = strtolower(trim($student->student_code ?: ''));
         $nat_id   = strtolower(trim($student->national_id ?: ''));
 
         $matched = false;
-        if (!empty($stu_code) && $clean_input === $stu_code) {
-            $matched = true;
-        } elseif (!empty($nat_id) && $clean_input === $nat_id) {
-            $matched = true;
+        if ($verify_method === 'code') {
+            $matched = (!empty($stu_code) && $clean_input === $stu_code);
+        } elseif ($verify_method === 'nat_id') {
+            $matched = (!empty($nat_id) && $clean_input === $nat_id);
+        } else {
+            $matched = (($clean_input === $stu_code && !empty($stu_code)) || ($clean_input === $nat_id && !empty($nat_id)));
         }
 
         if (!$matched) {
-            wp_send_json_error('رمز التحقق غير مطابق لبيانات الطالب المسجلة.');
+            $err_msg = 'رمز التحقق غير مطابق لبيانات الطالب المسجلة.';
+            if ($verify_method === 'code') $err_msg = 'كود الطالب المدخل غير مطابق للبيانات المسجلة.';
+            elseif ($verify_method === 'nat_id') $err_msg = 'رقم الهوية الوطنية غير مطابق للبيانات المسجلة.';
+            wp_send_json_error($err_msg);
         }
 
         global $wpdb;
@@ -14643,6 +14759,11 @@ class SM_Public {
             $portal_mode = 'card_application';
         }
 
+        $verify_method = sanitize_text_field($_POST['verify_method'] ?? 'both');
+        if (!in_array($verify_method, array('code', 'nat_id', 'both'), true)) {
+            $verify_method = 'both';
+        }
+
         $raw_req_fields = $_POST['required_fields'] ?? array('guardian_phone', 'dob');
         $required_fields = is_array($raw_req_fields) ? array_map('sanitize_text_field', $raw_req_fields) : array('guardian_phone', 'dob');
 
@@ -14651,6 +14772,7 @@ class SM_Public {
 
         update_option('sm_exit_card_settings', array(
             'portal_mode' => $portal_mode,
+            'verify_method' => $verify_method,
             'required_fields' => $required_fields,
             'max_requests' => $max_reqs,
             'redirect_discipline' => $redirect

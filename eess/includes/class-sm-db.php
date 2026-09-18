@@ -596,6 +596,7 @@ class SM_DB {
             $wpdb->delete("{$wpdb->prefix}sm_clinic", array('student_id' => $id));
             $wpdb->delete("{$wpdb->prefix}sm_grades", array('student_id' => $id));
             $wpdb->delete("{$wpdb->prefix}sm_assignments", array('student_id' => $id));
+            $wpdb->delete("{$wpdb->prefix}sm_exit_card_requests", array('student_id' => $id));
 
             return $wpdb->delete("{$wpdb->prefix}sm_students", array('id' => $id));
         }
@@ -606,6 +607,7 @@ class SM_DB {
         global $wpdb;
         SM_Logger::log('حذف كافة البيانات');
         $wpdb->query("TRUNCATE TABLE {$wpdb->prefix}sm_records");
+        $wpdb->query("TRUNCATE TABLE {$wpdb->prefix}sm_exit_card_requests");
         $wpdb->query("TRUNCATE TABLE {$wpdb->prefix}sm_students");
     }
 

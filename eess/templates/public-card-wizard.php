@@ -16,12 +16,14 @@ $is_admin = is_user_logged_in() && (current_user_can('manage_options') || curren
 
 $card_settings = get_option('sm_exit_card_settings', array(
     'portal_mode' => 'card_application',
+    'verify_method' => 'both',
     'required_fields' => array('guardian_phone', 'dob'),
     'max_requests' => 3,
     'redirect_discipline' => 'yes'
 ));
 
 $portal_mode = $card_settings['portal_mode'] ?? 'card_application';
+$verify_method = $card_settings['verify_method'] ?? 'both';
 $required_fields = (array) ($card_settings['required_fields'] ?? array('guardian_phone', 'dob'));
 ?>
 
@@ -41,7 +43,7 @@ $required_fields = (array) ($card_settings['required_fields'] ?? array('guardian
 .eess-portal-left-content {
     flex: 1 1 660px;
     min-width: 320px;
-    order: 2; /* In RTL direction, order:2 positions content on the LEFT */
+    order: 2;
     background: #ffffff;
     border-radius: 20px;
     border: 1px solid #e2e8f0;
@@ -53,7 +55,7 @@ $required_fields = (array) ($card_settings['required_fields'] ?? array('guardian
     flex: 0 0 280px;
     width: 280px;
     max-width: 100%;
-    order: 1; /* In RTL direction, order:1 positions navigation sidebar on the RIGHT */
+    order: 1;
     background: #ffffff;
     border-radius: 20px;
     border: 1px solid #e2e8f0;
@@ -101,15 +103,15 @@ $required_fields = (array) ($card_settings['required_fields'] ?? array('guardian
 .sb-nav-btn.active svg {
     stroke: #ffffff;
 }
-.eess-btn-action {
+.eess-btn-action-compact {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 5px;
-    height: 34px;
-    padding: 0 10px;
-    border-radius: 8px;
-    font-size: 11px;
+    gap: 4px;
+    height: 30px;
+    padding: 0 8px;
+    border-radius: 6px;
+    font-size: 10.5px;
     font-weight: 800;
     cursor: pointer;
     border: none;
@@ -197,17 +199,17 @@ $required_fields = (array) ($card_settings['required_fields'] ?? array('guardian
             <div id="w-panel-step-2" style="display: none;">
                 <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px; margin-bottom: 18px;">
                     <h4 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 800; color: #0f172a;">تأكيد التحقق من هوية الطالب</h4>
-                    <p style="margin: 0 0 14px 0; font-size: 12px; color: #64748b; font-weight: 600;">يرجى إدخال كود الطالب المسجل أو رقم الهوية الوطنية للتحقق والأمان:</p>
+                    <p style="margin: 0 0 14px 0; font-size: 12px; color: #64748b; font-weight: 600;">يرجى إدخال بيانات التحقق المطلوبة للأمان:</p>
 
                     <div style="margin-bottom: 12px;">
-                        <label style="font-size: 12px; font-weight: 700; color: #334155; display: block; margin-bottom: 4px;">كود الطالب أو رقم الهوية الوطنية <span style="color:#ef4444;">*</span></label>
+                        <label style="font-size: 12px; font-weight: 700; color: #334155; display: block; margin-bottom: 4px;">رمز التحقق المعتمد <span style="color:#ef4444;">*</span></label>
                         <input type="text" id="w_verify_code_input" placeholder="أدخل كود الطالب أو الهوية الوطنية..." style="width: 100%; height: 44px; border-radius: 10px; border: 1.5px solid #cbd5e1; padding: 0 14px; font-size: 13px; font-weight: 700; box-sizing: border-box;">
                     </div>
 
                     <button type="button" onclick="wVerifyStudentIdentity()" id="w_btn_verify_id" style="width: 100%; height: 42px; background: #0f172a; color: white; border: none; border-radius: 10px; font-weight: 800; font-size: 13px; cursor: pointer;">تأكيد والتحقق من الهوية</button>
                 </div>
 
-                <!-- Verification Result & Existing Status Panel -->
+                <!-- Verification Result & Student Code Display Box -->
                 <div id="w-verified-status-panel" style="display: none; margin-bottom: 18px;"></div>
 
                 <!-- DYNAMIC MISSING REQUIRED DATA COMPLETION FORM -->
@@ -270,7 +272,7 @@ $required_fields = (array) ($card_settings['required_fields'] ?? array('guardian
 
                     <div style="background: #fffbe3; border: 1px solid #fde047; border-radius: 10px; padding: 14px; font-size: 11.5px; color: #854d0e; line-height: 1.6; margin-bottom: 14px;">
                         <strong>تعهد وإقرار ولي الأمر الرسمي:</strong><br>
-                        أقر أنا ولي أمر الطالب المذكور أعلاه بطلبي الرسمي لإصدار بطاقة تصريح الخروج الرقمية للطالب. وأتحمل المسؤولية الكاملة عن خروج الطالب واستئذانه بموجب هذا التصريح.
+                        أقر أنا ولي أمر الطالب المذكور أعلاه بطلبي الرسمي لإصدار بطاقة تصريح الخروج الرقمية للطالب. وأتحمل المسؤولية الكاملة عن خروج الطالب واستئذانه بموجب هذا التصريح وإقرار بإخلاء طرف إدارة المدرسة.
                     </div>
 
                     <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; font-size: 12px; font-weight: 800; color: #0f172a; margin-bottom: 16px;">
@@ -347,6 +349,7 @@ $required_fields = (array) ($card_settings['required_fields'] ?? array('guardian
 
             <form onsubmit="wSavePortalSettingsFromView(event)">
                 <input type="hidden" name="portal_mode" value="<?php echo esc_attr($portal_mode); ?>">
+                <input type="hidden" name="verify_method" value="<?php echo esc_attr($verify_method); ?>">
 
                 <div class="eess-req-fields-grid" style="margin-bottom: 20px;">
                     <?php
@@ -381,8 +384,8 @@ $required_fields = (array) ($card_settings['required_fields'] ?? array('guardian
         <!-- VIEW 3: PORTAL OPERATING MODE (SETTINGS VIEW) -->
         <div id="pv-view-operating-mode" style="display: none;">
             <div style="border-bottom: 2px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 18px;">
-                <h3 style="margin: 0 0 4px 0; font-size: 18px; font-weight: 900; color: #0f172a;">⚙️ نمط عمل البوابة (Portal Mode)</h3>
-                <div style="font-size: 12px; color: #64748b;">اختر طريقة وطبيعة تقديم الخدمة للمستخدمين عبر هذا الرابط:</div>
+                <h3 style="margin: 0 0 4px 0; font-size: 18px; font-weight: 900; color: #0f172a;">⚙️ نمط عمل البوابة والتحقق</h3>
+                <div style="font-size: 12px; color: #64748b;">اختر طريقة وطبيعة تقديم الخدمة وآلية التحقق للمستخدمين عبر هذا الرابط:</div>
             </div>
 
             <form onsubmit="wSavePortalSettingsFromView(event)">
@@ -391,26 +394,51 @@ $required_fields = (array) ($card_settings['required_fields'] ?? array('guardian
                     <input type="hidden" name="required_fields[]" value="<?php echo esc_attr($rf); ?>">
                 <?php endforeach; ?>
 
-                <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">
-                    <label style="display: flex; align-items: flex-start; gap: 12px; background: #f8fafc; border: 2px solid <?php echo ($portal_mode === 'card_application') ? '#881337' : '#e2e8f0'; ?>; border-radius: 14px; padding: 16px; cursor: pointer;">
-                        <input type="radio" name="portal_mode" value="card_application" <?php checked($portal_mode, 'card_application'); ?> style="width: 20px; height: 20px; margin-top: 2px;">
-                        <div>
-                            <div style="font-size: 14px; font-weight: 900; color: #0f172a; margin-bottom: 2px;">تقديم بطاقات تصريح الخروج + استكمال البيانات</div>
-                            <div style="font-size: 12px; color: #64748b; line-height: 1.5;">يتيح للطلاب وأولياء الأمور تقديم طلب تصريح خروج رسمي مع اشتراط استكمال أي بيانات مفقودة تلقائياً خلال الطلب.</div>
-                        </div>
-                    </label>
+                <!-- Portal Operating Mode -->
+                <div style="margin-bottom: 20px;">
+                    <label style="font-size: 13px; font-weight: 900; color: #0f172a; display: block; margin-bottom: 8px;">1. نمط تقديم الخدمة:</label>
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <label style="display: flex; align-items: flex-start; gap: 10px; background: #f8fafc; border: 1.5px solid <?php echo ($portal_mode === 'card_application') ? '#881337' : '#e2e8f0'; ?>; border-radius: 12px; padding: 14px; cursor: pointer;">
+                            <input type="radio" name="portal_mode" value="card_application" <?php checked($portal_mode, 'card_application'); ?> style="width: 18px; height: 18px; margin-top: 2px;">
+                            <div>
+                                <div style="font-size: 13.5px; font-weight: 900; color: #0f172a;">تقديم بطاقات تصريح الخروج + استكمال البيانات</div>
+                                <div style="font-size: 11.5px; color: #64748b;">تقديم طلب تصريح خروج رسمي مع استكمال أي بيانات مفقودة.</div>
+                            </div>
+                        </label>
 
-                    <label style="display: flex; align-items: flex-start; gap: 12px; background: #f8fafc; border: 2px solid <?php echo ($portal_mode === 'update_only') ? '#881337' : '#e2e8f0'; ?>; border-radius: 14px; padding: 16px; cursor: pointer;">
-                        <input type="radio" name="portal_mode" value="update_only" <?php checked($portal_mode, 'update_only'); ?> style="width: 20px; height: 20px; margin-top: 2px;">
-                        <div>
-                            <div style="font-size: 14px; font-weight: 900; color: #0f172a; margin-bottom: 2px;">تحديث بيانات الطالب فقط (Data Update Only)</div>
-                            <div style="font-size: 12px; color: #64748b; line-height: 1.5;">يقتصر عمل البوابة على التحقق واستكمال البيانات المطلوبة المحددة فقط دون فتح خيار تقديم بطاقة خروج.</div>
-                        </div>
-                    </label>
+                        <label style="display: flex; align-items: flex-start; gap: 10px; background: #f8fafc; border: 1.5px solid <?php echo ($portal_mode === 'update_only') ? '#881337' : '#e2e8f0'; ?>; border-radius: 14px; padding: 14px; cursor: pointer;">
+                            <input type="radio" name="portal_mode" value="update_only" <?php checked($portal_mode, 'update_only'); ?> style="width: 18px; height: 18px; margin-top: 2px;">
+                            <div>
+                                <div style="font-size: 13.5px; font-weight: 900; color: #0f172a;">تحديث بيانات الطالب فقط (Data Update Only)</div>
+                                <div style="font-size: 11.5px; color: #64748b;">استكمال البيانات المطلوبة فقط دون فتح خيار تقديم بطاقات الخروج.</div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Verification Step Settings -->
+                <div style="margin-bottom: 20px;">
+                    <label style="font-size: 13px; font-weight: 900; color: #0f172a; display: block; margin-bottom: 8px;">2. طريقة التحقق من الهوية (الخطوة الثانية):</label>
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <label style="display: flex; align-items: center; gap: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; cursor: pointer; font-size: 12.5px; font-weight: 800;">
+                            <input type="radio" name="verify_method" value="both" <?php checked($verify_method, 'both'); ?> style="width: 18px; height: 18px;">
+                            <span>كود الطالب أو رقم الهوية الوطنية (كلاهما مقبول)</span>
+                        </label>
+
+                        <label style="display: flex; align-items: center; gap: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; cursor: pointer; font-size: 12.5px; font-weight: 800;">
+                            <input type="radio" name="verify_method" value="code" <?php checked($verify_method, 'code'); ?> style="width: 18px; height: 18px;">
+                            <span>كود الطالب فقط (Student Code Only)</span>
+                        </label>
+
+                        <label style="display: flex; align-items: center; gap: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; cursor: pointer; font-size: 12.5px; font-weight: 800;">
+                            <input type="radio" name="verify_method" value="nat_id" <?php checked($verify_method, 'nat_id'); ?> style="width: 18px; height: 18px;">
+                            <span>رقم الهوية الوطنية فقط (National ID Only)</span>
+                        </label>
+                    </div>
                 </div>
 
                 <?php if ($is_admin): ?>
-                    <button type="submit" style="height: 44px; padding: 0 28px; background: #0f172a; color: white; border: none; border-radius: 10px; font-weight: 800; font-size: 13px; cursor: pointer;">حفظ نمط العمل</button>
+                    <button type="submit" style="height: 44px; padding: 0 28px; background: #0f172a; color: white; border: none; border-radius: 10px; font-weight: 800; font-size: 13px; cursor: pointer;">حفظ الإعدادات والضوابط</button>
                 <?php else: ?>
                     <div style="font-size: 12px; color: #991b1b; background: #fef2f2; padding: 10px; border-radius: 8px;">تنبيه: تعديل الإعدادات متاح فقط لمشرفي النظام.</div>
                 <?php endif; ?>
@@ -459,7 +487,7 @@ $required_fields = (array) ($card_settings['required_fields'] ?? array('guardian
             <!-- Item 3: Portal Operating Mode -->
             <button type="button" class="sb-nav-btn" onclick="wSwitchPortalView('pv-view-operating-mode', this)">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-                <span>نمط عمل البوابة</span>
+                <span>نمط عمل البوابة والتحقق</span>
             </button>
 
             <!-- Item 4: Exit Permit Requests -->
@@ -677,7 +705,7 @@ function wVerifyStudentIdentity() {
     photoContainer.style.display = 'none';
 
     if (!codeVal) {
-        eessShowToast('يرجى إدخال كود الطالب أو الهوية الوطنية.', 'error');
+        eessShowToast('يرجى إدخال رمز التحقق المطلوبة.', 'error');
         return;
     }
 
@@ -698,7 +726,14 @@ function wVerifyStudentIdentity() {
             const btnNext = document.getElementById('w_btn_next_2');
 
             let html = '<div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:14px; padding:16px;">';
-            html += '<div style="font-size:13px; font-weight:800; color:#16a34a; margin-bottom:6px;">✓ تم التحقق بنجاح من هويّة الطالب</div>';
+            html += '<div style="font-size:13px; font-weight:800; color:#16a34a; margin-bottom:8px;">✓ تم التحقق بنجاح من هويّة الطالب</div>';
+
+            // Prominent Student Code Highlight Box for Student Reference
+            html += '<div style="background:#f0fdf4; border:1.5px solid #86efac; border-radius:12px; padding:12px; margin-bottom:12px;">';
+            html += '<div style="font-size:11px; color:#166534; font-weight:800;">📌 كود الطالب المعتمد الخاص بك:</div>';
+            html += '<div style="font-size:20px; font-weight:900; color:#881337; font-family:monospace; margin:2px 0;">' + res.data.student.student_code + '</div>';
+            html += '<div style="font-size:11px; color:#15803d; font-weight:700;">يرجى تدوين وحفظ كود الطالب لاستخدامه في متابعة الطلب والخدمات المدرسية القادمة.</div>';
+            html += '</div>';
 
             if (res.data.missing_fields && res.data.missing_fields.length > 0) {
                 wRenderMissingFieldsForm(res.data.missing_fields, res.data.student);
@@ -824,7 +859,7 @@ function wSubmitMissingData(e) {
             btn.innerText = 'حفظ وتحديث البيانات الحالية';
 
             if (res.success) {
-                eessShowToast(res.data.message || 'تم حغظ وتحديث البيانات بنجاح.', 'success');
+                eessShowToast(res.data.message || 'تم حفظ وتحديث البيانات بنجاح.', 'success');
                 document.getElementById('w-missing-data-container').style.display = 'none';
                 wVerifyStudentIdentity();
             } else {
@@ -999,10 +1034,12 @@ function wLoadCardRequestsFull() {
     const box = document.getElementById('pv-requests-cards-container');
     if (!box) return;
 
+    // Cache-buster timestamp _ts included to guarantee fresh data on refresh
     jQuery.post('<?php echo $ajax_url; ?>', {
         action: 'sm_manage_card_requests',
         action_type: 'list',
-        nonce: '<?php echo $admin_nonce; ?>'
+        nonce: '<?php echo $admin_nonce; ?>',
+        _ts: Date.now()
     }, function(res) {
         if (res.success && res.data && res.data.length > 0) {
             let html = '';
@@ -1017,63 +1054,68 @@ function wLoadCardRequestsFull() {
                 if (r.verification_status === 'parent_confirmed') { vbadgeBg = '#d1fae5'; vbadgeColor = '#065f46'; }
                 else if (r.verification_status === 'parent_not_confirmed') { vbadgeBg = '#fee2e2'; vbadgeColor = '#991b1b'; }
 
-                // Build exact formal Arabic WhatsApp message
+                // Build exact formal Arabic WhatsApp message with disclaimer release text
                 let waText = "السيد/السيدة ولي أمر الطالب/ة المحترم/ة،\n\n";
                 waText += "نحيطكم علمًا بأنه تم تقديم طلب إصدار بطاقة تصريح خروج للطالب/ة " + r.student_name + "، كود الطالب " + r.student_code + ".\n\n";
-                waText += "ونظرًا لأن إصدار بطاقة تصريح الخروج يتطلب التأكد من موافقة ولي الأمر، نرجو منكم التكرم بتأكيد ما إذا كان هذا الطلب قد تم تقديمه من قبلكم أو بموافقتكم، وأنكم توافقون على إصدار بطاقة تصريح خروج للطالب/ة والسماح له/لها بالخروج في نهاية الدوام المدرسي وفقًا للأنظمة والإجراءات المعتمدة لدى المدرسة.\n\n";
+                waText += "ونظرًا لأن إصدار بطاقة تصريح الخروج يتطلب التأكد من موافقة ولي الأمر، نرجو منكم التكرم بتأكيد موافقتكم وتحمل المسؤولية الكاملة عن الطالب/ة خارج أسوار المدرسة وإخلاء طرف إدارة المدرسة وكوادرها وفق الأنظمة المعتمدة.\n\n";
                 waText += "في حال موافقتكم، يرجى الرد على هذه الرسالة بالنص التالي:\n\n";
-                waText += '\"أؤكد أنني ولي أمر الطالب/ة المذكور/ة أعلاه، وأوافق على إصدار بطاقة تصريح الخروج والسماح له/لها بالخروج في نهاية الدوام المدرسي.\"\n\n';
+                waText += '\"أؤكد أنني ولي أمر الطالب/ة المذكور/ة أعلاه، وأوافق على إصدار بطاقة تصريح الخروج وتحمل المسؤولية الكاملة عن خروجه/ها خارج المدرسة والإقرار بإخلاء طرف إدارة المدرسة.\"\n\n';
                 waText += "وفي حال عدم تقديمكم للطلب أو عدم موافقتكم عليه، يرجى توضيح ذلك في الرد.\n\n";
                 waText += "شاكرين لكم تعاونكم وتأكيدكم.\n\n";
                 waText += "مع خالص التقدير والاحترام.";
 
                 let waUrl = 'https://api.whatsapp.com/send?phone=' + encodeURIComponent(r.wa_phone) + '&text=' + encodeURIComponent(waText);
 
-                html += '<div style="background:#f8fafc; border:1.5px solid #e2e8f0; border-radius:16px; padding:16px; box-shadow:0 4px 12px rgba(0,0,0,0.03); display:flex; flex-direction:column; justify-content:space-between; gap:10px;">';
+                html += '<div style="background:#f8fafc; border:1.5px solid #e2e8f0; border-radius:16px; padding:14px; box-shadow:0 4px 12px rgba(0,0,0,0.03); display:flex; flex-direction:column; justify-content:space-between; gap:10px;">';
 
                 html += '<div>';
                 html += '<div style="display:flex; justify-content:space-between; align-items:flex-start; gap:6px; margin-bottom:6px;">';
                 html += '<div>';
-                html += '<div style="font-size:14.5px; font-weight:900; color:#0f172a; line-height:1.3;">' + r.student_name + '</div>';
-                html += '<div style="font-size:11.5px; color:#881337; font-weight:800; margin-top:2px;">كود الطالب: ' + r.student_code + '</div>';
+                html += '<div style="font-size:14px; font-weight:900; color:#0f172a; line-height:1.3;">' + r.student_name + '</div>';
+                html += '<div style="font-size:11px; color:#881337; font-weight:800; margin-top:2px;">كود الطالب: ' + r.student_code + '</div>';
                 html += '</div>';
                 html += '<div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">';
                 html += '<span style="background:' + badgeBg + '; color:' + badgeColor + '; padding:2px 8px; border-radius:6px; font-size:10.5px; font-weight:800;">' + r.status_label + '</span>';
                 html += '<span style="background:' + vbadgeBg + '; color:' + vbadgeColor + '; padding:2px 8px; border-radius:6px; font-size:10.5px; font-weight:800;">' + r.verification_label + '</span>';
                 html += '</div></div>';
 
-                html += '<div style="font-size:11.5px; color:#475569; line-height:1.6; margin-bottom:4px;">';
+                html += '<div style="font-size:11px; color:#475569; line-height:1.5; margin-bottom:4px;">';
                 html += '<div><strong>الصف:</strong> ' + r.class_name + ' (' + r.section + ') | <strong>المرجع:</strong> <span style="font-family:monospace;">' + r.reference_no + '</span></div>';
                 html += '<div><strong>ولي الأمر:</strong> ' + r.parent_name + ' (' + r.parent_phone + ')</div>';
                 html += '</div>';
                 html += '</div>';
 
-                // Standardized Action Buttons Row
-                html += '<div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px; border-top:1px solid #e2e8f0; padding-top:10px; margin-top: auto;">';
+                // Standardized Compact Action Buttons Row
+                html += '<div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:6px; border-top:1px solid #e2e8f0; padding-top:10px; margin-top: auto;">';
 
                 // Button 1: View / Review
-                html += '<button type="button" class="eess-btn-action" onclick="wViewCardRequestDetails(' + r.id + ')" style="background:#0f172a; color:white;">';
-                html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+                html += '<button type="button" class="eess-btn-action-compact" onclick="wViewCardRequestDetails(' + r.id + ')" style="background:#0f172a; color:white;">';
+                html += '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
                 html += '<span>عرض/مراجعة</span></button>';
 
                 // Button 2: WhatsApp Verification
                 if (r.wa_phone) {
-                    html += '<a href="' + waUrl + '" target="_blank" class="eess-btn-action" style="background:#25D366; color:white;">';
-                    html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.3 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>';
+                    html += '<a href="' + waUrl + '" target="_blank" class="eess-btn-action-compact" style="background:#25D366; color:white;">';
+                    html += '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.3 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>';
                     html += '<span>تحقق واتساب</span></a>';
                 } else {
-                    html += '<span class="eess-btn-action" style="background:#cbd5e1; color:#64748b;">لا يوجد هاتف</span>';
+                    html += '<span class="eess-btn-action-compact" style="background:#cbd5e1; color:#64748b;">لا يوجد هاتف</span>';
                 }
 
-                // Button 3: Print Card
-                html += '<button type="button" class="eess-btn-action" onclick="wPrintStudentCard(' + r.student_id + ')" style="background:#881337; color:white;">';
-                html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>';
+                // Button 3: Print Official Request Doc
+                html += '<button type="button" class="eess-btn-action-compact" onclick="wPrintExitRequestDoc(' + r.id + ')" style="background:#0284c7; color:white;">';
+                html += '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>';
+                html += '<span>طباعة الوثيقة</span></button>';
+
+                // Button 4: Print Student Exit Card (Using Student Affairs Print Engine)
+                html += '<button type="button" class="eess-btn-action-compact" onclick="wPrintStudentCard(' + r.student_id + ')" style="background:#881337; color:white;">';
+                html += '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>';
                 html += '<span>طباعة البطاقة</span></button>';
 
-                // Button 4: Delete Request
-                html += '<button type="button" class="eess-btn-action" onclick="wPromptDeleteRequest(' + r.id + ', \'' + r.student_name.replace(/'/g, "\\'") + '\')" style="background:#fee2e2; color:#991b1b; border:1px solid #fecdd3;">';
-                html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
-                html += '<span>حذف الطلب</span></button>';
+                // Button 5: Delete Request
+                html += '<button type="button" class="eess-btn-action-compact" onclick="wPromptDeleteRequest(' + r.id + ', \'' + r.student_name.replace(/'/g, "\\'") + '\')" style="background:#fee2e2; color:#991b1b; border:1px solid #fecdd3; grid-column: span 2;">';
+                html += '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
+                html += '<span>حذف طلب التصريح</span></button>';
 
                 html += '</div>';
 
@@ -1149,23 +1191,41 @@ function wViewCardRequestDetails(reqId) {
         if (res.success && res.data) {
             const d = res.data;
             let html = '<div style="line-height:1.7;">';
-            html += '<div><strong>الرقم المرجعي:</strong> ' + d.reference_no + '</div>';
-            html += '<div><strong>اسم الطالب:</strong> ' + d.student_name + ' (' + d.class_name + ' / ' + d.section + ')</div>';
-            html += '<div><strong>كود الطالب:</strong> ' + d.student_code + '</div>';
-            html += '<div><strong>ولي الأمر:</strong> ' + d.parent_name + ' (' + d.parent_phone + ')</div>';
+            html += '<div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; background:#f8fafc; padding:12px; border-radius:10px; margin-bottom:12px;">';
+            html += '<div><strong>الرقم المرجعي:</strong> <span style="font-family:monospace; font-weight:900; color:#881337;">' + d.reference_no + '</span></div>';
             html += '<div><strong>تاريخ الطلب:</strong> ' + d.created_at + '</div>';
-            html += '<div><strong>حالة الطلب:</strong> ' + d.status_label + '</div>';
-
-            if (d.signature_data) {
-                html += '<div style="margin-top:10px;"><strong>التوقيع الإلكتروني:</strong><br><img src="' + d.signature_data + '" style="max-height:60px; border:1px solid #cbd5e1; border-radius:6px; padding:4px; margin-top:4px;"></div>';
-            }
+            html += '<div><strong>اسم الطالب:</strong> ' + d.student_name + '</div>';
+            html += '<div><strong>كود الطالب:</strong> <span style="font-family:monospace; font-weight:900;">' + d.student_code + '</span></div>';
+            html += '<div><strong>الصف والشعبة:</strong> ' + d.class_name + ' (' + d.section + ')</div>';
+            html += '<div><strong>الهوية الوطنية:</strong> ' + d.national_id + '</div>';
+            html += '<div style="grid-column: span 2;"><strong>ولي الأمر:</strong> ' + d.parent_name + ' (' + d.parent_phone + ')</div>';
+            html += '</div>';
 
             <?php if ($is_admin): ?>
-                html += '<div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:10px; display:flex; gap:8px;">';
-                html += '<button type="button" onclick="wUpdateReqStatus(' + d.id + ', \'approved\')" style="background:#16a34a; color:white; border:none; padding:6px 14px; border-radius:6px; font-weight:800; cursor:pointer;">موافقة</button>';
-                html += '<button type="button" onclick="wUpdateReqStatus(' + d.id + ', \'rejected\')" style="background:#dc2626; color:white; border:none; padding:6px 14px; border-radius:6px; font-weight:800; cursor:pointer;">رفض</button>';
-                html += '</div>';
+                html += '<div style="margin-bottom:14px; background:#fffbe3; border:1px solid #fde047; padding:10px 14px; border-radius:10px;">';
+                html += '<label style="font-size:12px; font-weight:800; color:#854d0e; display:block; margin-bottom:4px;">تعديل حالة الطلب مباشرة:</label>';
+                html += '<select onchange="wUpdateReqStatus(' + d.id + ', this.value)" style="width:100%; height:36px; border-radius:8px; border:1px solid #cbd5e1; font-size:12px; font-weight:800;">';
+                html += '<option value="submitted" ' + (d.status==='submitted'?'selected':'') + '>تم تقديم الطلب</option>';
+                html += '<option value="under_review" ' + (d.status==='under_review'?'selected':'') + '>قيد المراجعة والتدقيق</option>';
+                html += '<option value="approved" ' + (d.status==='approved'?'selected':'') + '>موافقة إدارية رسمية</option>';
+                html += '<option value="preparing" ' + (d.status==='preparing'?'selected':'') + '>جاري تجهيز وتغليف البطاقة</option>';
+                html += '<option value="issued" ' + (d.status==='issued'?'selected':'') + '>تم الإصدار والتسليم</option>';
+                html += '<option value="rejected" ' + (d.status==='rejected'?'selected':'') + '>رفض الطلب</option>';
+                html += '</select></div>';
             <?php endif; ?>
+
+            if (d.signature_data) {
+                html += '<div style="margin-bottom:14px;">';
+                html += '<div style="font-weight:800; margin-bottom:4px; color:#0f172a;">التوقيع الإلكتروني المعتمد لولي الأمر:</div>';
+                html += '<div style="background:white; border:2px dashed #cbd5e1; border-radius:10px; padding:8px; text-align:center;">';
+                html += '<img src="' + d.signature_data + '" style="max-height:60px; object-fit:contain;" alt="Signature">';
+                html += '</div></div>';
+            }
+
+            html += '<div style="margin-top:14px; border-top:1px solid #e2e8f0; padding-top:10px; display:flex; gap:8px; justify-content:flex-end;">';
+            html += '<button type="button" onclick="wPrintExitRequestDoc(' + d.id + ')" style="background:#0284c7; color:white; border:none; padding:6px 14px; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">🖨️ طباعة الوثيقة A4</button>';
+            html += '<button type="button" onclick="wPrintStudentCard(' + d.student_id + ')" style="background:#881337; color:white; border:none; padding:6px 14px; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer;">🪪 طباعة البطاقة</button>';
+            html += '</div>';
 
             html += '</div>';
 
@@ -1194,6 +1254,10 @@ function wUpdateReqStatus(reqId, status) {
 }
 
 function wPrintStudentCard(studentId) {
-    window.open('<?php echo admin_url('admin-ajax.php?action=sm_print_student_card&student_id='); ?>' + studentId, '_blank');
+    window.open('<?php echo admin_url('admin-ajax.php?action=sm_print&print_type=student_card&student_id='); ?>' + studentId, '_blank');
+}
+
+function wPrintExitRequestDoc(reqId) {
+    window.open('<?php echo admin_url('admin-ajax.php?action=sm_print&print_type=exit_permit_request&request_id='); ?>' + reqId + '&auto_print=1', '_blank');
 }
 </script>
