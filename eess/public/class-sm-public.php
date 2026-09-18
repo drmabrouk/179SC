@@ -249,11 +249,7 @@ class SM_Public {
         wp_enqueue_style('dashicons');
         wp_enqueue_style('google-font-cairo', 'https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&family=Noto+Kufi+Arabic:wght@300;400;600;700;800&display=swap', array(), null);
         wp_enqueue_script('chart-js', 'https://cdn.jsdelivr.net/npm/chart.js', array(), '4.4.1', true);
-        wp_register_script('html5-qrcode', SM_PLUGIN_URL . 'assets/js/html5-qrcode.min.js', array(), '2.3.8', true);
-        $active_tab = isset($_GET['sm_tab']) ? sanitize_text_field($_GET['sm_tab']) : '';
-        if ($active_tab === 'attendance') {
-            wp_enqueue_script('html5-qrcode');
-        }
+        wp_enqueue_script('html5-qrcode', SM_PLUGIN_URL . 'assets/js/html5-qrcode.min.js', array(), '2.3.8', true);
         wp_enqueue_style($this->plugin_name, SM_PLUGIN_URL . 'assets/css/sm-public.css', array('dashicons'), $this->version, 'all');
 
         $app = SM_Settings::get_appearance();
@@ -919,24 +915,59 @@ class SM_Public {
                 reader.style.display = 'block';
                 if (btn) btn.innerText = '🛑 إيقاف الكاميرا';
 
-                if (typeof Html5Qrcode !== 'undefined') {
-                    mAttScannerInstance = new Html5Qrcode("m-att-camera-reader");
-                    mAttScannerInstance.start({ facingMode: "environment" }, { fps: 15, qrbox: 250 }, function(decodedText) {
-                        var code = decodedText.trim();
-                        var now = Date.now();
-                        if (code && (code !== mAttLastScannedCode || now - mAttLastScanTime > 1500)) {
-                            mAttLastScannedCode = code;
-                            mAttLastScanTime = now;
-                            eessProcessMobileBarcodeAttendance(code);
+                function startAttCam() {
+                    if (typeof Html5Qrcode !== 'undefined') {
+                        if (!mAttScannerInstance) {
+                            mAttScannerInstance = new Html5Qrcode("m-att-camera-reader");
                         }
-                    }).catch(function(err) {
-                        alert('تعذر فتح كاميرا الحضور: ' + err);
-                        reader.style.display = 'none';
-                        if (btn) btn.innerText = '📷 تشغيل كاميرا ماسح الحضور المستمر';
-                    });
-                } else {
-                    alert('مكتبة الكاميرا غير جاهزة حالياً.');
+                        var formats = (typeof Html5QrcodeSupportedFormats !== 'undefined') ? [
+                            Html5QrcodeSupportedFormats.CODE_128,
+                            Html5QrcodeSupportedFormats.CODE_39,
+                            Html5QrcodeSupportedFormats.EAN_13,
+                            Html5QrcodeSupportedFormats.QR_CODE
+                        ] : undefined;
+
+                        var config = { fps: 20, qrbox: 250, formatsToSupport: formats };
+
+                        var onScan = function(decodedText) {
+                            var code = decodedText.trim();
+                            var now = Date.now();
+                            if (code && (code !== mAttLastScannedCode || now - mAttLastScanTime > 1500)) {
+                                mAttLastScannedCode = code;
+                                mAttLastScanTime = now;
+                                eessProcessMobileBarcodeAttendance(code);
+                            }
+                        };
+
+                        mAttScannerInstance.start({ facingMode: "environment" }, config, onScan).catch(function(err) {
+                            if (typeof Html5Qrcode.getCameras === 'function') {
+                                Html5Qrcode.getCameras().then(function(cams) {
+                                    if (cams && cams.length > 0) {
+                                        mAttScannerInstance.start(cams[cams.length - 1].id, config, onScan).catch(function(e) {
+                                            eessShowMobileToast('تعذر فتح الكاميرا: ' + e, 'error');
+                                            reader.style.display = 'none';
+                                            if (btn) btn.innerText = '📷 تشغيل كاميرا ماسح الحضور المستمر';
+                                        });
+                                    } else {
+                                        eessShowMobileToast('لم يتم العثور على كاميرا متصلة بالهاتف.', 'error');
+                                        reader.style.display = 'none';
+                                    }
+                                }).catch(function(e) {
+                                    eessShowMobileToast('تعذر فتح الكاميرا: ' + err, 'error');
+                                    reader.style.display = 'none';
+                                });
+                            } else {
+                                eessShowMobileToast('تعذر فتح الكاميرا: ' + err, 'error');
+                                reader.style.display = 'none';
+                            }
+                        });
+                    } else {
+                        eessShowMobileToast('جاري تحضير وتهيئة الكاميرا...', 'info');
+                        setTimeout(startAttCam, 400);
+                    }
                 }
+
+                startAttCam();
             }
 
             function eessProcessMobileBarcodeAttendance(barcode) {
@@ -1122,40 +1153,68 @@ class SM_Public {
                 if (!reader) return;
                 reader.style.display = 'block';
 
-                if (typeof Html5Qrcode !== 'undefined') {
-                    if (mInfoScannerInstance) {
-                        mInfoScannerInstance.stop().catch(function(){}).then(function(){
-                            mInfoScannerInstance = null;
-                            eessStartMobileInfoCamera();
-                        });
-                        return;
-                    }
-                    mInfoScannerInstance = new Html5Qrcode("m-info-camera-reader");
-                    mInfoScannerInstance.start({ facingMode: "environment" }, { fps: 15, qrbox: 250 }, function(decodedText) {
-                        var cleanCode = decodedText.trim();
-                        if (mInfoScannerInstance) {
-                            mInfoScannerInstance.stop().then(function() {
-                                mInfoScannerInstance = null;
-                                reader.style.display = 'none';
-                                var searchInp = document.getElementById('m_info_search_input');
-                                if (searchInp) searchInp.value = cleanCode;
-                                eessSearchStudentInfoByCode(cleanCode);
-                            }).catch(function() {
-                                mInfoScannerInstance = null;
-                                reader.style.display = 'none';
-                                eessSearchStudentInfoByCode(cleanCode);
-                            });
-                        } else {
-                            reader.style.display = 'none';
-                            eessSearchStudentInfoByCode(cleanCode);
+                function startInfoCam() {
+                    if (typeof Html5Qrcode !== 'undefined') {
+                        if (!mInfoScannerInstance) {
+                            mInfoScannerInstance = new Html5Qrcode("m-info-camera-reader");
                         }
-                    }).catch(function(err) {
-                        alert('تعذر فتح كاميرا الاستعلام: ' + err);
-                        reader.style.display = 'none';
-                    });
-                } else {
-                    alert('مكتبة الكاميرا غير جاهزة حالياً.');
+                        var formats = (typeof Html5QrcodeSupportedFormats !== 'undefined') ? [
+                            Html5QrcodeSupportedFormats.CODE_128,
+                            Html5QrcodeSupportedFormats.CODE_39,
+                            Html5QrcodeSupportedFormats.EAN_13,
+                            Html5QrcodeSupportedFormats.QR_CODE
+                        ] : undefined;
+
+                        var config = { fps: 20, qrbox: 250, formatsToSupport: formats };
+
+                        var onScan = function(decodedText) {
+                            var cleanCode = decodedText.trim();
+                            if (mInfoScannerInstance) {
+                                mInfoScannerInstance.stop().then(function() {
+                                    mInfoScannerInstance = null;
+                                    reader.style.display = 'none';
+                                    var searchInp = document.getElementById('m_info_search_input');
+                                    if (searchInp) searchInp.value = cleanCode;
+                                    eessSearchStudentInfoByCode(cleanCode);
+                                }).catch(function() {
+                                    mInfoScannerInstance = null;
+                                    reader.style.display = 'none';
+                                    eessSearchStudentInfoByCode(cleanCode);
+                                });
+                            } else {
+                                reader.style.display = 'none';
+                                eessSearchStudentInfoByCode(cleanCode);
+                            }
+                        };
+
+                        mInfoScannerInstance.start({ facingMode: "environment" }, config, onScan).catch(function(err) {
+                            if (typeof Html5Qrcode.getCameras === 'function') {
+                                Html5Qrcode.getCameras().then(function(cams) {
+                                    if (cams && cams.length > 0) {
+                                        mInfoScannerInstance.start(cams[cams.length - 1].id, config, onScan).catch(function(e) {
+                                            eessShowMobileToast('تعذر فتح الكاميرا: ' + e, 'error');
+                                            reader.style.display = 'none';
+                                        });
+                                    } else {
+                                        eessShowMobileToast('لم يتم العثور على كاميرا متصلة.', 'error');
+                                        reader.style.display = 'none';
+                                    }
+                                }).catch(function(e) {
+                                    eessShowMobileToast('تعذر فتح الكاميرا: ' + err, 'error');
+                                    reader.style.display = 'none';
+                                });
+                            } else {
+                                eessShowMobileToast('تعذر فتح الكاميرا: ' + err, 'error');
+                                reader.style.display = 'none';
+                            }
+                        });
+                    } else {
+                        eessShowMobileToast('جاري تحضير وتهيئة الكاميرا...', 'info');
+                        setTimeout(startInfoCam, 400);
+                    }
                 }
+
+                startInfoCam();
             }
 
             function eessSwitchMobileIdentMethod(method, btn) {
@@ -1202,31 +1261,81 @@ class SM_Public {
 
             function eessStartMobileViolCamera() {
                 var reader = document.getElementById('m-viol-camera-reader');
-                reader.style.display = 'block';
+                if (!reader) return;
 
-                if (typeof Html5Qrcode !== 'undefined') {
-                    mViolScannerInstance = new Html5Qrcode("m-viol-camera-reader");
-                    mViolScannerInstance.start({ facingMode: "environment" }, { fps: 15, qrbox: { width: 240, height: 160 } }, function(decodedText) {
-                        const code = decodedText.trim();
-                        const now = Date.now();
-
-                        if (now - lastViolScanTime < 1000 && code === lastViolScannedCode) {
-                            return;
-                        }
-                        lastViolScanTime = now;
-                        lastViolScannedCode = code;
-
-                        if (scannedMobileStudentCodes.includes(code)) {
-                            eessShowMobileToast('تم رصد المخالفة لهذا الطالب بالفعل', 1000);
-                            return;
-                        }
-
-                        eessResolveMobileViolStudent(code);
-                    }).catch(function(err) {
-                        eessShowMobileToast('تعذر فتح الكاميرا: ' + err, 'error');
+                if (mViolScannerInstance) {
+                    mViolScannerInstance.stop().then(function() {
+                        mViolScannerInstance = null;
+                        reader.style.display = 'none';
+                    }).catch(function() {
+                        mViolScannerInstance = null;
                         reader.style.display = 'none';
                     });
+                    return;
                 }
+
+                reader.style.display = 'block';
+
+                function startViolCam() {
+                    if (typeof Html5Qrcode !== 'undefined') {
+                        if (!mViolScannerInstance) {
+                            mViolScannerInstance = new Html5Qrcode("m-viol-camera-reader");
+                        }
+                        var formats = (typeof Html5QrcodeSupportedFormats !== 'undefined') ? [
+                            Html5QrcodeSupportedFormats.CODE_128,
+                            Html5QrcodeSupportedFormats.CODE_39,
+                            Html5QrcodeSupportedFormats.EAN_13,
+                            Html5QrcodeSupportedFormats.QR_CODE
+                        ] : undefined;
+
+                        var config = { fps: 20, qrbox: { width: 260, height: 160 }, formatsToSupport: formats };
+
+                        var onScan = function(decodedText) {
+                            const code = decodedText.trim();
+                            const now = Date.now();
+
+                            if (now - lastViolScanTime < 1000 && code === lastViolScannedCode) {
+                                return;
+                            }
+                            lastViolScanTime = now;
+                            lastViolScannedCode = code;
+
+                            if (scannedMobileStudentCodes.includes(code)) {
+                                eessShowMobileToast('تم رصد المخالفة لهذا الطالب بالفعل', 1000);
+                                return;
+                            }
+
+                            eessResolveMobileViolStudent(code);
+                        };
+
+                        mViolScannerInstance.start({ facingMode: "environment" }, config, onScan).catch(function(err) {
+                            if (typeof Html5Qrcode.getCameras === 'function') {
+                                Html5Qrcode.getCameras().then(function(cams) {
+                                    if (cams && cams.length > 0) {
+                                        mViolScannerInstance.start(cams[cams.length - 1].id, config, onScan).catch(function(e) {
+                                            eessShowMobileToast('تعذر فتح الكاميرا: ' + e, 'error');
+                                            reader.style.display = 'none';
+                                        });
+                                    } else {
+                                        eessShowMobileToast('لم يتم العثور على كاميرا متصلة بالهاتف.', 'error');
+                                        reader.style.display = 'none';
+                                    }
+                                }).catch(function(e) {
+                                    eessShowMobileToast('تعذر فتح الكاميرا: ' + err, 'error');
+                                    reader.style.display = 'none';
+                                });
+                            } else {
+                                eessShowMobileToast('تعذر فتح الكاميرا: ' + err, 'error');
+                                reader.style.display = 'none';
+                            }
+                        });
+                    } else {
+                        eessShowMobileToast('جاري تحضير الكاميرا...', 'info');
+                        setTimeout(startViolCam, 400);
+                    }
+                }
+
+                startViolCam();
             }
 
             function eessMobileSearchStudentUnified() {
@@ -9300,7 +9409,7 @@ class SM_Public {
 
         $quiet = 10;
         $bar_width = 2;
-        $height = 50;
+        $height = 65;
         $total_modules = count($modules) + ($quiet * 2);
         $width = $total_modules * $bar_width;
 
@@ -10817,10 +10926,11 @@ class SM_Public {
                     .card-field-val { color: #0f172a; font-weight: 900; white-space: nowrap; }
 
                     /* Barcode Stack Aligned Left Above Bottom Strip */
-                    .card-qr-stack { display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-end; width: 31mm; flex-shrink: 0; text-align: left; margin-top: auto; }
-                    .card-qr-box { width: 31mm; height: 14.5mm; border: none; border-radius: 0; padding: 0; background: transparent; box-shadow: none; }
+                    .card-qr-stack { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; width: 32mm; flex-shrink: 0; text-align: center; margin-top: auto; }
+                    .card-qr-box { width: 32mm; height: 15mm; border: none; border-radius: 0; padding: 0; background: transparent; box-shadow: none; }
                     .card-qr-box svg { width: 100%; height: 100%; display: block; }
                     .card-qr-box svg rect:first-child { fill: transparent !important; }
+                    .card-barcode-code-label { font-size: 7px; font-weight: 900; color: #0f172a; font-family: monospace, sans-serif; letter-spacing: 1.5px; text-align: center; width: 100%; margin-top: 1px; display: block; white-space: nowrap; }
                     .card-serial-text { display: none !important; }
 
                     /* Footer Area */
@@ -10955,6 +11065,7 @@ class SM_Public {
                             </div>
                             <div class="card-qr-stack">
                                 <div class="card-qr-box" title="<?php echo esc_attr($barcode_identity); ?>"><?php echo $qr_svg; ?></div>
+                                <span class="card-barcode-code-label"><?php echo esc_html($barcode_identity); ?></span>
                             </div>
                         </div>
 
