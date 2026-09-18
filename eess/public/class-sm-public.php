@@ -7976,6 +7976,72 @@ class SM_Public {
         ));
     }
 
+    public function ajax_eess_admin_delete_institution_students() {
+        $user_roles = (array) wp_get_current_user()->roles;
+        $is_sys_admin = in_array('administrator', $user_roles, true) || in_array('sm_system_admin', $user_roles, true) || current_user_can('manage_options');
+        if (!$is_sys_admin) wp_send_json_error('عفواً، يتطلب هذا الإجراء صلاحيات مدير النظام فقط.');
+
+        check_ajax_referer('sm_admin_action', 'nonce');
+
+        $inst_id = intval($_POST['inst_id'] ?? 0);
+        if ($inst_id <= 0) wp_send_json_error('يرجى تحديد المؤسسة بشكل صحيح.');
+
+        global $wpdb;
+        $inst = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}eess_institutions WHERE id = %d LIMIT 1", $inst_id));
+        if (!$inst) wp_send_json_error('المؤسسة غير موجودة.');
+
+        $deleted = $wpdb->query($wpdb->prepare(
+            "DELETE FROM {$wpdb->prefix}sm_students WHERE institution_id = %d OR school_id = %d",
+            $inst_id, $inst_id
+        ));
+
+        SM_Logger::log('حذف طلاب مؤسسة', "قام مدير النظام بحذف ($deleted) طالب تابعين لمؤسسة: {$inst->name} (ID: {$inst_id})");
+        wp_cache_flush();
+
+        wp_send_json_success(array('message' => "تم حذف $deleted طالب تابع لمؤسسة ({$inst->name}) بنجاح."));
+    }
+
+    public function ajax_eess_admin_reset_student_sequence() {
+        $user_roles = (array) wp_get_current_user()->roles;
+        $is_sys_admin = in_array('administrator', $user_roles, true) || in_array('sm_system_admin', $user_roles, true) || current_user_can('manage_options');
+        if (!$is_sys_admin) wp_send_json_error('عفواً، يتطلب هذا الإجراء صلاحيات مدير النظام فقط.');
+
+        check_ajax_referer('sm_admin_action', 'nonce');
+
+        $inst_id = intval($_POST['inst_id'] ?? 0);
+        if ($inst_id <= 0) wp_send_json_error('يرجى تحديد المؤسسة بشكل صحيح.');
+
+        $acad_prefix = class_exists('EESS_ID_Code_Service') ? EESS_ID_Code_Service::get_academic_year_code() : '2627';
+        $counter_type = 'student_' . $acad_prefix;
+
+        if (class_exists('EESS_ID_Code_Service')) {
+            EESS_ID_Code_Service::get_next_sequence($inst_id, $counter_type, 0);
+        }
+
+        SM_Logger::log('إعادة ضبط التسلسل الرقمي للطلاب', "قام مدير النظام بضبط العداد الرقمي للمؤسسة ID: {$inst_id} للعام {$acad_prefix} إلى 00001.");
+        wp_send_json_success(array('message' => 'تم إعادة ضبط التسلسل الرقمي بنجاح. سيبدأ كود الطالب الجديد من 00001.'));
+    }
+
+    public function ajax_eess_admin_update_academic_year() {
+        $user_roles = (array) wp_get_current_user()->roles;
+        $is_sys_admin = in_array('administrator', $user_roles, true) || in_array('sm_system_admin', $user_roles, true) || current_user_can('manage_options');
+        if (!$is_sys_admin) wp_send_json_error('عفواً، يتطلب هذا الإجراء صلاحيات مدير النظام فقط.');
+
+        check_ajax_referer('sm_admin_action', 'nonce');
+
+        $acad_year = sanitize_text_field($_POST['academic_year'] ?? '');
+        if (empty($acad_year)) wp_send_json_error('يرجى إدخال العام الدراسي بشكل صحيح.');
+
+        $struct = SM_Settings::get_academic_structure();
+        $struct['academic_year'] = $acad_year;
+        update_option('sm_academic_structure', $struct);
+
+        SM_Logger::log('تحديث العام الدراسي النظامي', "قام مدير النظام بتغيير العام الدراسي المعتمد إلى: {$acad_year}");
+        wp_cache_flush();
+
+        wp_send_json_success(array('message' => "تم تحديث العام الدراسي النظامي إلى: {$acad_year}"));
+    }
+
     public function ajax_eess_student_change_password() {
         if (!is_user_logged_in()) {
             wp_send_json_error('عفواً، يتطلب هذا الإجراء تسجيل الدخول أولاً.');

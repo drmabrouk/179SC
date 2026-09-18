@@ -179,6 +179,9 @@ class SM_DB {
     }
 
     public static function generate_student_code($school_id = null) {
+        if (class_exists('EESS_ID_Code_Service')) {
+            return EESS_ID_Code_Service::generate_student_code($school_id ?: 1);
+        }
         global $wpdb;
         $inst_code = 1;
         if (!empty($school_id)) {
