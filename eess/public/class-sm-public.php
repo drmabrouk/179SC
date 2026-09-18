@@ -14413,6 +14413,9 @@ class SM_Public {
                 'created_at' => date_i18n('Y-m-d H:i', strtotime($active_req->created_at))
             ) : null,
             'total_prev_requests' => $total_prev_requests,
+            'fee_required' => ($total_prev_requests >= 1),
+            'fee_amount' => ($total_prev_requests >= 1) ? 10 : 0,
+            'fee_notice' => ($total_prev_requests >= 1) ? 'تم إصدار بطاقة تصريح خروج سابقة لهذا الطالب. يرجى التكرم بمراجعة قسم السلوك بالمدرسة لسداد رسم إعادة الطباعة وقدره (10 دراهم إماراتية) لإتمام معالجة الطلب.' : '',
             'exceeded_limit' => $exceeded_limit,
             'max_allowed' => $max_reqs
         ));
@@ -14703,9 +14706,66 @@ class SM_Public {
         return $descs[$status] ?? 'الطلب تحت الإجراء الإداري المعتمد.';
     }
 
+    public static function is_card_admin() {
+        if (!is_user_logged_in()) return false;
+        $user = wp_get_current_user();
+        $roles = (array) $user->roles;
+        return (
+            current_user_can('manage_options') ||
+            current_user_can('إدارة_الطلاب') ||
+            current_user_can('شؤون_الطلاب') ||
+            current_user_can('manage_students') ||
+            in_array('administrator', $roles, true) ||
+            in_array('sm_system_admin', $roles, true) ||
+            in_array('sm_principal', $roles, true) ||
+            in_array('sm_supervisor', $roles, true) ||
+            in_array('sm_discipline_supervisor', $roles, true) ||
+            in_array('sm_activities_supervisor', $roles, true)
+        );
+    }
+
+    public function ajax_public_check_previous_request() {
+        $query = sanitize_text_field($_POST['search_query'] ?? '');
+        if (empty($query)) {
+            wp_send_json_error('يرجى إدخال رقم الهوية الوطنية أو الرقم المرجعي للطلب.');
+        }
+
+        global $wpdb;
+        $clean_q = trim($query);
+
+        $req = $wpdb->get_row($wpdb->prepare(
+            "SELECT r.*, s.name as student_name, s.student_code, s.class_name, s.section, s.national_id
+             FROM {$wpdb->prefix}sm_exit_card_requests r
+             JOIN {$wpdb->prefix}sm_students s ON r.student_id = s.id
+             WHERE s.national_id = %s OR r.reference_no = %s OR r.id = %d
+             ORDER BY r.id DESC LIMIT 1",
+            $clean_q, $clean_q, intval($clean_q)
+        ));
+
+        if (!$req) {
+            wp_send_json_error('لم يتم العثور على طلب تصريح خروج مسجل يطابق البيانات المدخلة.');
+        }
+
+        $name_parts = explode(' ', trim($req->student_name));
+        $first_name = $name_parts[0] ?? '';
+        $last_name = end($name_parts);
+        $display_stu_name = $first_name . ' ' . ($last_name && $last_name !== $first_name ? $last_name : '');
+
+        wp_send_json_success(array(
+            'reference_no' => $req->reference_no ?: ('EXT-' . date('Y') . '-' . $req->id),
+            'student_name' => $display_stu_name ?: 'الطالب/ة',
+            'class_name' => $req->class_name ?: '-',
+            'section' => $req->section ?: '-',
+            'status' => $req->status,
+            'status_label' => self::eess_get_exit_card_status_label($req->status),
+            'status_desc' => self::eess_get_exit_card_status_desc($req->status),
+            'created_at' => date_i18n('Y-m-d H:i', strtotime($req->created_at))
+        ));
+    }
+
     public function ajax_get_exit_card_request_details() {
         check_ajax_referer('sm_admin_action', 'nonce');
-        if (!is_user_logged_in() || (!current_user_can('إدارة_الطلاب') && !current_user_can('manage_options') && !current_user_can('manage_students'))) {
+        if (!self::is_card_admin()) {
             wp_send_json_error('عفواً، لا تمتلك الصلاحية المطلوبة.');
         }
 
@@ -14750,7 +14810,7 @@ class SM_Public {
         if (!wp_verify_nonce($_POST['nonce'] ?? '', 'sm_admin_action') && !wp_verify_nonce($_POST['nonce'] ?? '', 'eess_admin_action')) {
             wp_send_json_error('Security check failed');
         }
-        if (!is_user_logged_in() || (!current_user_can('manage_options') && !current_user_can('إدارة_الطلاب'))) {
+        if (!self::is_card_admin()) {
             wp_send_json_error('عفواً، لا تمتلك الصلاحية الكافية.');
         }
 
@@ -14805,7 +14865,7 @@ class SM_Public {
         if (!wp_verify_nonce($_REQUEST['nonce'] ?? '', 'sm_admin_action') && !wp_verify_nonce($_REQUEST['nonce'] ?? '', 'eess_admin_action')) {
             wp_send_json_error('Security check failed');
         }
-        if (!is_user_logged_in() || (!current_user_can('manage_options') && !current_user_can('إدارة_الطلاب'))) {
+        if (!self::is_card_admin()) {
             wp_send_json_error('عفواً، لا تمتلك الصلاحية الكافية.');
         }
 
