@@ -7564,74 +7564,42 @@ class SM_Public {
         $output = fopen('php://output', 'w');
         fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF)); // BOM for Excel
 
-        // Complete 30 Comprehensive Columns (A to AD)
+        // Standardized 12-Column Format matching Student Import Specification
         fputcsv($output, array(
+            'كود المدرسة (School Code)',
             'كود الطالب (Student Code)',
-            'الرقم التسلسلي (Serial Number)',
             'الاسم الكامل (Full Name)',
+            'رقم الهوية الوطنية (National ID)',
             'الجنس (Gender)',
             'تاريخ الميلاد (Date of Birth)',
             'الجنسية (Nationality)',
-            'رقم الهوية الوطنية (National ID)',
-            'الصف الدراسي (Grade)',
-            'الشعبة / الفصل (Section)',
-            'العام الدراسي (Academic Year)',
-            'معرف المدرسة (School ID)',
+            'إمارة السكن (Emirate)',
+            'الصف (Grade)',
+            'الشعبة (Section)',
             'اسم ولي الأمر (Guardian Name)',
-            'صلة القرابة (Guardian Relationship)',
-            'البريد الإلكتروني لولي الأمر (Guardian Email)',
-            'رقم هاتف ولي الأمر (Guardian Phone)',
-            'حالة الطالب (Student Status)',
-            'حالة التسجيل (Enrollment Status)',
-            'تاريخ التسجيل (Enrollment Date)',
-            'الإمارة (Emirate)',
-            'العنوان (Address)',
-            'ملاحظة سلوكية (Student Behavior)',
-            'المستوى الأكاديمي (Academic Level)',
-            'أصحاب الهمم / احتياجات خاصة (Special Needs)',
-            'الحالة الصحية (Health Status)',
-            'الحساسية والتنبيهات الطبية (Allergies)',
-            'رابط الصورة الشخصية (Photo URL)',
-            'حالة الرسوم (Fee Status)',
-            'إجمالي الرسوم (Total Tuition Fees)',
-            'المبلغ المدفوع (Amount Paid)',
-            'المبلغ المتبقي (Outstanding Balance)',
-            'حالة الشيك / الدفع (Payment Status)'
+            'رقم هاتف ولي الأمر (Guardian Phone)'
         ));
 
+        // Pre-cache institutions for code lookup
+        $inst_codes = $wpdb->get_results("SELECT id, code FROM {$wpdb->prefix}eess_institutions", OBJECT_K);
+
         foreach ($records as $r) {
+            $sid = intval($r->school_id ?: $r->institution_id ?: 1);
+            $school_code = isset($inst_codes[$sid]) ? $inst_codes[$sid]->code : $sid;
+
             fputcsv($output, array(
+                $school_code,
                 $r->student_code,
-                $r->id,
                 $r->name,
+                $r->national_id,
                 $r->gender ?: 'ذكر',
                 $r->dob ?: '',
-                $r->nationality ?: 'سعودي',
-                $r->national_id,
+                $r->nationality ?: 'الإمارات العربية المتحدة',
+                $r->emirate ?: 'الشارقة',
                 $r->class_name,
                 $r->section,
-                '2026-2027',
-                $r->school_id,
-                $r->guardian_name ?: '',
-                $r->guardian_relationship ?: 'أب',
-                $r->parent_email,
-                $r->guardian_phone,
-                $r->student_status ?: 'Active',
-                $r->enrollment_status ?: 'Enrolled',
-                $r->enrollment_date ?: $r->registration_date,
-                $r->emirate ?: 'أبوظبي',
-                $r->address ?: '',
-                '', // Behavior note placeholder
-                $r->academic_level ?: 'ممتاز',
-                $r->special_needs ? 'Yes' : 'No',
-                $r->health_status ?: 'سليم',
-                $r->allergies ?: 'لا توجد حساسية',
-                $r->photo_url,
-                $r->fee_status ?: 'Unpaid',
-                $r->total_tuition_fees ?: '0.00',
-                $r->amount_paid ?: '0.00',
-                $r->outstanding_balance ?: '0.00',
-                $r->payment_status ?: 'Pending'
+                $r->guardian_name,
+                $r->guardian_phone
             ));
         }
         fclose($output);
@@ -7743,7 +7711,7 @@ class SM_Public {
     }
 
     public function ajax_upload_import_csv() {
-        if (!current_user_can('إدارة_الطلاب')) wp_send_json_error('Unauthorized');
+        if (!current_user_can('إدارة_الطلاب') && !current_user_can('manage_options')) wp_send_json_error('Unauthorized');
         if (!wp_verify_nonce($_POST['nonce'], 'sm_admin_action')) wp_send_json_error('Security check failed');
 
         if (empty($_FILES['csv_file']['tmp_name'])) wp_send_json_error('No file uploaded');
@@ -7752,11 +7720,12 @@ class SM_Public {
         $temp_dir = $upload_dir['basedir'] . '/sm_temp';
         if (!file_exists($temp_dir)) wp_mkdir_p($temp_dir);
 
-        $file_name = 'import_' . get_current_user_id() . '_' . time() . '.csv';
+        $job_id = 'imp_' . md5(uniqid(microtime(), true));
+        $file_name = 'import_' . $job_id . '.csv';
         $file_path = $temp_dir . '/' . $file_name;
 
         if (move_uploaded_file($_FILES['csv_file']['tmp_name'], $file_path)) {
-            // Count rows
+            // Count total rows
             $handle = fopen($file_path, "r");
             $total_rows = 0;
             while (fgetcsv($handle) !== FALSE) {
@@ -7764,21 +7733,25 @@ class SM_Public {
             }
             fclose($handle);
 
-            // Initialize Results Transient
-            $results = array(
-                'total'     => $total_rows - 1, // minus header
-                'success'   => 0,
-                'warning'   => 0,
-                'error'     => 0,
-                'duplicate' => 0,
-                'generated' => 0, // Count of auto-generated IDs
-                'details'   => array()
+            $job_state = array(
+                'job_id'          => $job_id,
+                'file_path'       => $file_path,
+                'total_rows'      => max(0, $total_rows - 1),
+                'processed_rows' => 0,
+                'last_row_index'  => 0,
+                'success'         => 0,
+                'duplicate'       => 0,
+                'error'           => 0,
+                'details'         => array(),
+                'failed_rows_log' => array()
             );
-            set_transient('sm_import_results_' . get_current_user_id(), $results, HOUR_IN_SECONDS);
+
+            update_option('eess_import_job_' . $job_id, $job_state, false);
 
             wp_send_json_success(array(
+                'job_id'    => $job_id,
                 'file_path' => $file_path,
-                'total'     => $total_rows - 1
+                'total'     => max(0, $total_rows - 1)
             ));
         } else {
             wp_send_json_error('Failed to move uploaded file');
@@ -7786,17 +7759,46 @@ class SM_Public {
     }
 
     public function ajax_process_import_chunk() {
-        if (!current_user_can('إدارة_الطلاب')) wp_send_json_error('Unauthorized');
+        if (!current_user_can('إدارة_الطلاب') && !current_user_can('manage_options')) wp_send_json_error('Unauthorized');
         if (!wp_verify_nonce($_POST['nonce'], 'sm_admin_action')) wp_send_json_error('Security check failed');
 
-        $file_path = sanitize_text_field($_POST['file_path']);
-        $offset = intval($_POST['offset']);
-        $chunk_size = 20;
+        $job_id = sanitize_text_field($_POST['job_id'] ?? '');
+        $file_path_param = sanitize_text_field($_POST['file_path'] ?? '');
 
-        if (!file_exists($file_path)) wp_send_json_error('Temp file not found');
+        if (empty($job_id) && !empty($file_path_param)) {
+            $job_id = 'imp_' . md5($file_path_param);
+        }
 
-        $results = get_transient('sm_import_results_' . get_current_user_id());
-        if (!$results) wp_send_json_error('Session expired');
+        $job_state = get_option('eess_import_job_' . $job_id);
+
+        if (!$job_state) {
+            if (!empty($file_path_param) && file_exists($file_path_param)) {
+                $handle = fopen($file_path_param, "r");
+                $total_rows = 0;
+                while (fgetcsv($handle) !== FALSE) $total_rows++;
+                fclose($handle);
+
+                $job_state = array(
+                    'job_id'          => $job_id,
+                    'file_path'       => $file_path_param,
+                    'total_rows'      => max(0, $total_rows - 1),
+                    'processed_rows' => 0,
+                    'last_row_index'  => 0,
+                    'success'         => 0,
+                    'duplicate'       => 0,
+                    'error'           => 0,
+                    'details'         => array(),
+                    'failed_rows_log' => array()
+                );
+            } else {
+                wp_send_json_error('جلسة الاستيراد غير موجودة على الخادم.');
+            }
+        }
+
+        $file_path = $job_state['file_path'];
+        if (!file_exists($file_path)) {
+            wp_send_json_error('ملف البيانات المؤقت غير موجود على الخادم.');
+        }
 
         $handle = fopen($file_path, "r");
 
@@ -7814,13 +7816,17 @@ class SM_Public {
             }
         }
 
-        // Skip header and seek to offset
+        // Skip header
         fgetcsv($handle, 0, $delimiter);
-        for ($i = 0; $i < $offset; $i++) {
+
+        // Fast seek to last processed row index
+        $start_offset = intval($job_state['last_row_index']);
+        for ($i = 0; $i < $start_offset; $i++) {
             fgetcsv($handle, 0, $delimiter);
         }
 
         $processed = 0;
+        $chunk_size = 25;
         global $wpdb;
 
         // Pre-cache institutions & schools in memory for high-speed row resolution
@@ -7829,7 +7835,7 @@ class SM_Public {
 
         while ($processed < $chunk_size && ($data = fgetcsv($handle, 0, $delimiter)) !== FALSE) {
             $processed++;
-            $row_index = $offset + $processed + 1;
+            $row_index = $start_offset + $processed + 1;
 
             try {
                 // Encoding Normalization
@@ -7841,8 +7847,10 @@ class SM_Public {
                 }
 
                 if (count($data) < 12) {
-                    $results['error']++;
-                    $results['details'][] = array('type' => 'error', 'msg' => "السطر $row_index: يحتوي على " . count($data) . " عموداً فقط. يجب أن يتضمن ملف الاستيراد 12 عموداً بالترتيب المعتمد.");
+                    $job_state['error']++;
+                    $msg = "السطر $row_index: يحتوي على " . count($data) . " عموداً فقط (المطلوب 12 عموداً).";
+                    $job_state['details'][] = array('type' => 'error', 'msg' => $msg);
+                    $job_state['failed_rows_log'][] = array('row' => $row_index, 'data' => implode(' | ', $data), 'reason' => 'عدد الأعمدة أقل من 12');
                     continue;
                 }
 
@@ -7859,7 +7867,7 @@ class SM_Public {
                 $guardian_name_input = trim($data[10] ?? '');
                 $guardian_phone_input= trim($data[11] ?? '');
 
-                // 1. Validate School Code using pre-cached mapping
+                // 1. Validate School Code
                 $inst_match_id = null;
                 if (!empty($school_code_input)) {
                     if (is_numeric($school_code_input)) {
@@ -7889,15 +7897,19 @@ class SM_Public {
                 }
 
                 if (!empty($school_code_input) && !$inst_match_id) {
-                    $results['error']++;
-                    $results['details'][] = array('type' => 'error', 'msg' => "السطر $row_index: كود المدرسة '{$school_code_input}' غير صحيح أو غير مسجل بالنظام.");
+                    $job_state['error']++;
+                    $msg = "السطر $row_index: كود المدرسة '{$school_code_input}' غير صحيح أو غير مسجل بالنظام.";
+                    $job_state['details'][] = array('type' => 'error', 'msg' => $msg);
+                    $job_state['failed_rows_log'][] = array('row' => $row_index, 'data' => implode(' | ', $data), 'reason' => "كود المدرسة غير صحيح ($school_code_input)");
                     continue;
                 }
 
                 // 2. Validate Student Full Name
                 if (empty($name_input)) {
-                    $results['error']++;
-                    $results['details'][] = array('type' => 'error', 'msg' => "السطر $row_index: اسم الطالب مفقود ولا يمكن استيراد البيانات بدون الاسم.");
+                    $job_state['error']++;
+                    $msg = "السطر $row_index: اسم الطالب مفقود ولا يمكن استيراد البيانات بدون الاسم.";
+                    $job_state['details'][] = array('type' => 'error', 'msg' => $msg);
+                    $job_state['failed_rows_log'][] = array('row' => $row_index, 'data' => implode(' | ', $data), 'reason' => "اسم الطالب مفقود");
                     continue;
                 }
 
@@ -7905,8 +7917,10 @@ class SM_Public {
                 if (is_numeric($grade_input)) {
                     $grade_num = intval($grade_input);
                     if ($grade_num < 1 || $grade_num > 12) {
-                        $results['error']++;
-                        $results['details'][] = array('type' => 'error', 'msg' => "السطر $row_index: كود الصف '{$grade_input}' غير صحيح (يجب أن يكون من 1 إلى 12).");
+                        $job_state['error']++;
+                        $msg = "السطر $row_index: كود الصف '{$grade_input}' غير صحيح (يجب أن يكون من 1 إلى 12).";
+                        $job_state['details'][] = array('type' => 'error', 'msg' => $msg);
+                        $job_state['failed_rows_log'][] = array('row' => $row_index, 'data' => implode(' | ', $data), 'reason' => "كود الصف غير صحيح ($grade_input)");
                         continue;
                     }
                 }
@@ -7936,44 +7950,81 @@ class SM_Public {
 
                 $saved_id = EESS_Student_Data_Service::process_and_save_student($row_data);
                 if (is_wp_error($saved_id)) {
-                    $results['error']++;
-                    $results['details'][] = array('type' => 'error', 'msg' => "السطر $row_index: " . $saved_id->get_error_message());
+                    $job_state['error']++;
+                    $errMsg = $saved_id->get_error_message();
+                    $job_state['details'][] = array('type' => 'error', 'msg' => "السطر $row_index: " . $errMsg);
+                    $job_state['failed_rows_log'][] = array('row' => $row_index, 'data' => implode(' | ', $data), 'reason' => $errMsg);
                 } else {
-                    $results['success']++;
+                    $job_state['success']++;
                     if ($is_existing) {
-                        $results['duplicate']++;
-                        $results['details'][] = array('type' => 'info', 'msg' => "تم تحديث سجل ({$name_input}) في السطر $row_index");
-                    }
-                    if (empty($student_code_input)) {
-                        $results['generated']++;
+                        $job_state['duplicate']++;
+                        $job_state['details'][] = array('type' => 'info', 'msg' => "تم تحديث سجل ({$name_input}) في السطر $row_index");
                     }
                 }
             } catch (\Throwable $ex) {
-                $results['error']++;
-                $results['details'][] = array('type' => 'error', 'msg' => "السطر $row_index: خطأ في المعالجة — " . $ex->getMessage());
+                $job_state['error']++;
+                $job_state['details'][] = array('type' => 'error', 'msg' => "السطر $row_index: خطأ في المعالجة — " . $ex->getMessage());
+                $job_state['failed_rows_log'][] = array('row' => $row_index, 'data' => implode(' | ', $data), 'reason' => $ex->getMessage());
                 continue;
             }
         }
 
         fclose($handle);
-        set_transient('sm_import_results_' . get_current_user_id(), $results, HOUR_IN_SECONDS);
 
-        $is_finished = ($processed < $chunk_size);
+        $job_state['last_row_index'] = $start_offset + $processed;
+        $job_state['processed_rows'] = $job_state['last_row_index'];
+
+        $is_finished = ($job_state['processed_rows'] >= $job_state['total_rows']) || ($processed < $chunk_size);
+
         if ($is_finished) {
-            unlink($file_path);
-            SM_Logger::log('استيراد طلاب (AJAX)', "تم استيراد {$results['success']} طالب بنجاح.");
+            $job_state['finished'] = true;
+            @unlink($file_path);
+            SM_Logger::log('استيراد طلاب (دفعات)', "تم الانتهاء من استيراد {$job_state['success']} طالب بنجاح.");
         }
 
+        update_option('eess_import_job_' . $job_id, $job_state, false);
+
         wp_send_json_success(array(
-            'processed'        => $processed,
+            'job_id'           => $job_id,
+            'processed_batch'  => $processed,
             'finished'         => $is_finished,
-            'total_rows'       => $results['total'],
-            'processed_so_far' => $offset + $processed,
-            'success'          => $results['success'],
-            'duplicate'        => $results['duplicate'],
-            'error'            => $results['error'],
-            'details'          => $results['details']
+            'total_rows'       => $job_state['total_rows'],
+            'processed_so_far' => $job_state['processed_rows'],
+            'success'          => $job_state['success'],
+            'duplicate'        => $job_state['duplicate'],
+            'error'            => $job_state['error'],
+            'details'          => array_slice($job_state['details'], -20),
+            'has_failed_logs'  => !empty($job_state['failed_rows_log'])
         ));
+    }
+
+    public function ajax_download_import_error_log() {
+        if (!current_user_can('إدارة_الطلاب') && !current_user_can('manage_options')) {
+            wp_die('Unauthorized');
+        }
+
+        $job_id = sanitize_text_field($_GET['job_id'] ?? '');
+        $job_state = get_option('eess_import_job_' . $job_id);
+
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename=import_error_log_' . date('Y-m-d') . '.csv');
+        $output = fopen('php://output', 'w');
+        fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF)); // BOM for Excel
+
+        fputcsv($output, array('رقم السطر', 'البيانات المدخلة', 'سبب المستبعد / الخطأ'));
+
+        if ($job_state && !empty($job_state['failed_rows_log'])) {
+            foreach ($job_state['failed_rows_log'] as $item) {
+                fputcsv($output, array(
+                    $item['row'] ?? '',
+                    $item['data'] ?? '',
+                    $item['reason'] ?? ''
+                ));
+            }
+        }
+
+        fclose($output);
+        exit;
     }
 
     public function ajax_eess_admin_delete_institution_students() {
