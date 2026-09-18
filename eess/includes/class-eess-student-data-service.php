@@ -317,6 +317,17 @@ class EESS_Student_Data_Service {
         $fields['teacher_id'] = !empty($data['teacher_id']) ? intval($data['teacher_id']) : null;
 
         if ($student_id > 0) {
+            // Check if institution was changed (transfer scenario)
+            $existing_inst_id = $wpdb->get_var($wpdb->prepare("SELECT institution_id FROM {$wpdb->prefix}sm_students WHERE id = %d", $student_id));
+            if (empty($data['student_code']) && !empty($existing_inst_id) && intval($existing_inst_id) !== intval($institution_id)) {
+                // Institution changed and no manual code provided: Regenerate code for new institution
+                if (class_exists('EESS_ID_Code_Service')) {
+                    $fields['student_code'] = EESS_ID_Code_Service::generate_student_code($institution_id);
+                } else {
+                    $fields['student_code'] = SM_DB::generate_student_code($institution_id);
+                }
+            }
+
             $updated = $wpdb->update("{$wpdb->prefix}sm_students", $fields, array('id' => $student_id));
             if ($updated === false) {
                 return new WP_Error('db_update_failed', 'فشل تحديث بيانات الطالب في قاعدة البيانات: ' . $wpdb->last_error);
