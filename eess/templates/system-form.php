@@ -671,27 +671,67 @@ function renderSelectedStudents() {
 
             reader.style.display = 'block';
 
-            if (typeof Html5Qrcode !== 'undefined') {
-                desktopHtml5QrCode = new Html5Qrcode("reader");
-                const config = { fps: 15, qrbox: { width: 250, height: 160 } };
+            function startDesktopCamera() {
+                if (typeof Html5Qrcode !== 'undefined') {
+                    if (!desktopHtml5QrCode) {
+                        desktopHtml5QrCode = new Html5Qrcode("reader");
+                    }
 
-                desktopHtml5QrCode.start({ facingMode: "environment" }, config, function(decodedText) {
-                    const now = Date.now();
-                    const code = decodedText.trim();
+                    const formats = (typeof Html5QrcodeSupportedFormats !== 'undefined') ? [
+                        Html5QrcodeSupportedFormats.CODE_128,
+                        Html5QrcodeSupportedFormats.CODE_39,
+                        Html5QrcodeSupportedFormats.EAN_13,
+                        Html5QrcodeSupportedFormats.QR_CODE
+                    ] : undefined;
 
-                    if (now - lastScanTime < 1200 && code === lastScannedCode) return;
-                    lastScanTime = now;
-                    lastScannedCode = code;
+                    const config = {
+                        fps: 20,
+                        qrbox: { width: 280, height: 160 },
+                        formatsToSupport: formats
+                    };
 
-                    eessProcessDecodedStudentCode(code);
-                }).catch(err => {
-                    eessShowToast('تعذر فتح الكاميرا: ' + err, 'error');
-                    reader.style.display = 'none';
-                });
-            } else {
-                eessShowToast('جاري تحميل مكتبة الماسح الضوئي...', 'warning');
-                reader.style.display = 'none';
+                    const handleCode = function(decodedText) {
+                        const now = Date.now();
+                        const code = decodedText.trim();
+
+                        if (now - lastScanTime < 1200 && code === lastScannedCode) return;
+                        lastScanTime = now;
+                        lastScannedCode = code;
+
+                        eessProcessDecodedStudentCode(code);
+                    };
+
+                    desktopHtml5QrCode.start({ facingMode: "environment" }, config, handleCode)
+                    .catch(err => {
+                        if (typeof Html5Qrcode.getCameras === 'function') {
+                            Html5Qrcode.getCameras().then(cameras => {
+                                if (cameras && cameras.length > 0) {
+                                    const camId = cameras[cameras.length - 1].id;
+                                    desktopHtml5QrCode.start(camId, config, handleCode)
+                                    .catch(e => {
+                                        eessShowToast('تعذر فتح الكاميرا: ' + e, 'error');
+                                        reader.style.display = 'none';
+                                    });
+                                } else {
+                                    eessShowToast('لم يتم العثور على كاميرا متصلة بالجهاز.', 'error');
+                                    reader.style.display = 'none';
+                                }
+                            }).catch(e => {
+                                eessShowToast('تعذر الوصول للكاميرا: ' + e, 'error');
+                                reader.style.display = 'none';
+                            });
+                        } else {
+                            eessShowToast('تعذر فتح الكاميرا: ' + err, 'error');
+                            reader.style.display = 'none';
+                        }
+                    });
+                } else {
+                    eessShowToast('جاري تحميل مكتبة الماسح الضوئي...', 'warning');
+                    setTimeout(startDesktopCamera, 400);
+                }
             }
+
+            startDesktopCamera();
         });
     }
 

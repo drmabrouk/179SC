@@ -142,18 +142,18 @@ $to_num = min($offset + $limit, $total_students_count);
                 </div>
             </div>
 
-            <!-- Digital Exit Card Portal Icon Button -->
-            <a href="<?php echo esc_url(get_permalink(get_option('eess_exit_card_portal_page_id')) ?: home_url('/card/')); ?>" target="_blank" title="بوابة بطاقات الطلاب" style="width: 34px; height: 34px; border-radius: 8px; background: #ffffff; color: #0f172a; border: 1px solid #cbd5e1; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
-                <span class="dashicons dashicons-external" style="font-size: 16px; width: 16px; height: 16px; color: #0f172a;"></span>
-            </a>
-
-            <!-- Global Student PDF Export Button -->
+            <!-- Global Student PDF Export Button (Print Student Data) -->
             <?php if ($is_admin || current_user_can('manage_options') || in_array('sm_system_admin', $roles)): ?>
-            <button type="button" onclick="document.getElementById('eess-student-export-pdf-modal').style.display='flex'" title="تصدير كشوف الطلاب للطباعة الرسمية (PDF)" class="eess-hdr-btn" style="background: #ffffff !important; color: #881337 !important; border: 1px solid #fecdd3 !important; border-radius: 8px; height: 34px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; cursor: pointer; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
-                <span class="dashicons dashicons-pdf" style="font-size: 18px; width: 18px; height: 18px; color: #881337;"></span>
-                <span>تصدير طباعة كشوف الطلاب</span>
+            <button type="button" onclick="document.getElementById('eess-student-export-pdf-modal').style.display='flex'" title="طباعة بيانات الطلاب (PDF)" class="eess-hdr-btn" style="background: #ffffff !important; color: #881337 !important; border: 1px solid #fecdd3 !important; border-radius: 8px; height: 34px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; cursor: pointer; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
+                <span class="dashicons dashicons-printer" style="font-size: 18px; width: 18px; height: 18px; color: #881337;"></span>
+                <span>طباعة بيانات الطلاب</span>
             </button>
             <?php endif; ?>
+
+            <!-- Student Data Portal Icon Button (Aligned Next to Settings & Controls Icon) -->
+            <a href="<?php echo esc_url(get_permalink(get_option('eess_exit_card_portal_page_id')) ?: home_url('/card/')); ?>" target="_blank" title="بوابة بيانات وبطاقات الطلاب" class="eess-hdr-btn" style="background: #ffffff !important; color: #0f172a !important; border: 1px solid #cbd5e1 !important; border-radius: 8px; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; cursor: pointer; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
+                <span class="dashicons dashicons-id-alt" style="font-size: 18px; width: 18px; height: 18px; color: #0f172a;"></span>
+            </a>
 
             <!-- System Administrator Controls Gear Button -->
             <?php if ($is_admin || current_user_can('manage_options') || in_array('sm_system_admin', $roles)): ?>

@@ -670,7 +670,7 @@ class SM_Activator {
         dbDelta($sql_evaluations);
 
         self::add_custom_roles();
-        self::seed_demo_data();
+        self::remove_demo_data();
         self::create_default_pages();
         self::cleanup_legacy_pages();
         self::migrate_old_roles();
@@ -974,28 +974,11 @@ class SM_Activator {
         }
     }
 
-    private static function seed_demo_data() {
+    private static function remove_demo_data() {
         global $wpdb;
         $table_students = $wpdb->prefix . 'sm_students';
-        
-        $count = $wpdb->get_var("SELECT COUNT(*) FROM $table_students");
-        if ($count > 0) return;
-
-        $demo_students = array(
-            array('name' => 'أحمد محمد', 'class_name' => 'الصف الأول', 'parent_email' => 'parent1@example.com', 'student_code' => 'STU001'),
-            array('name' => 'سارة علي', 'class_name' => 'الصف الأول', 'parent_email' => 'parent2@example.com', 'student_code' => 'STU002'),
-            array('name' => 'خالد محمود', 'class_name' => 'الصف الثاني', 'parent_email' => 'parent3@example.com', 'student_code' => 'STU003'),
-            array('name' => 'ليلى يوسف', 'class_name' => 'الصف الثاني', 'parent_email' => 'parent4@example.com', 'student_code' => 'STU004'),
-            array('name' => 'عمر حسن', 'class_name' => 'الصف الثالث', 'parent_email' => 'parent5@example.com', 'student_code' => 'STU005'),
-            array('name' => 'مريم إبراهيم', 'class_name' => 'الصف الثالث', 'parent_email' => 'parent6@example.com', 'student_code' => 'STU006'),
-            array('name' => 'ياسين كمال', 'class_name' => 'الصف الرابع', 'parent_email' => 'parent7@example.com', 'student_code' => 'STU007'),
-            array('name' => 'نور الهدى', 'class_name' => 'الصف الرابع', 'parent_email' => 'parent8@example.com', 'student_code' => 'STU008'),
-            array('name' => 'عبد الله فهد', 'class_name' => 'الصف الخامس', 'parent_email' => 'parent9@example.com', 'student_code' => 'STU009'),
-            array('name' => 'هند سعادة', 'class_name' => 'الصف الخامس', 'parent_email' => 'parent10@example.com', 'student_code' => 'STU010'),
-        );
-
-        foreach ($demo_students as $student) {
-            $wpdb->insert($table_students, $student);
-        }
+        $demo_codes = array('STU001', 'STU002', 'STU003', 'STU004', 'STU005', 'STU006', 'STU007', 'STU008', 'STU009', 'STU010');
+        $in_clause = "'" . implode("','", $demo_codes) . "'";
+        $wpdb->query("DELETE FROM $table_students WHERE student_code IN ($in_clause) OR parent_email LIKE 'parent%@example.com'");
     }
 }
