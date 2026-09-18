@@ -25,11 +25,112 @@ $portal_mode = $card_settings['portal_mode'] ?? 'card_application';
 $required_fields = (array) ($card_settings['required_fields'] ?? array('guardian_phone', 'dob'));
 ?>
 
-<!-- Outer Flexible Layout Wrapper (Left Content Panel + Right Navigation Sidebar) -->
-<div class="eess-card-portal-wrapper" style="max-width: 1100px; margin: 20px auto; display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; font-family: 'Cairo', sans-serif; direction: rtl; box-sizing: border-box; color: #0f172a;">
+<style>
+.eess-card-portal-wrapper {
+    max-width: 1100px;
+    margin: 20px auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    align-items: flex-start;
+    font-family: 'Cairo', sans-serif;
+    direction: rtl;
+    box-sizing: border-box;
+    color: #0f172a;
+}
+.eess-portal-left-content {
+    flex: 1 1 660px;
+    min-width: 320px;
+    order: 2; /* In RTL direction, order:2 positions content on the LEFT */
+    background: #ffffff;
+    border-radius: 20px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 10px 30px rgba(15,23,42,0.08);
+    padding: 24px;
+    box-sizing: border-box;
+}
+.eess-portal-right-sidebar {
+    flex: 0 0 280px;
+    width: 280px;
+    max-width: 100%;
+    order: 1; /* In RTL direction, order:1 positions navigation sidebar on the RIGHT */
+    background: #ffffff;
+    border-radius: 20px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 10px 30px rgba(15,23,42,0.08);
+    padding: 18px;
+    box-sizing: border-box;
+}
+.eess-req-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+}
+.eess-req-fields-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+@media (max-width: 820px) {
+    .eess-portal-left-content { order: 2; }
+    .eess-portal-right-sidebar { order: 1; width: 100%; flex: 1 1 100%; }
+    .eess-req-cards-grid { grid-template-columns: 1fr; }
+    .eess-req-fields-grid { grid-template-columns: 1fr; }
+}
+.sb-nav-btn {
+    width: 100%;
+    text-align: right;
+    background: #f8fafc;
+    color: #334155;
+    border: 1px solid #e2e8f0;
+    padding: 12px 14px;
+    border-radius: 12px;
+    font-weight: 800;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.sb-nav-btn.active {
+    background: #881337;
+    color: #ffffff;
+    border: none;
+}
+.sb-nav-btn.active svg {
+    stroke: #ffffff;
+}
+.eess-btn-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    height: 34px;
+    padding: 0 10px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 800;
+    cursor: pointer;
+    border: none;
+    transition: background 0.2s;
+    box-sizing: border-box;
+    text-decoration: none;
+    white-space: nowrap;
+}
+</style>
+
+<!-- In-System Floating Toast Notification Component -->
+<div id="eess-toast-notification" style="display: none; position: fixed; bottom: 30px; left: 30px; z-index: 999999; background: #0f172a; color: white; padding: 14px 20px; border-radius: 12px; font-weight: 800; font-size: 13px; box-shadow: 0 10px 25px rgba(0,0,0,0.25); direction: rtl; font-family: 'Cairo', sans-serif; align-items: center; gap: 10px; border-right: 5px solid #16a34a;">
+    <span id="eess-toast-icon">✓</span>
+    <span id="eess-toast-message">تم التحديث بنجاح.</span>
+</div>
+
+<!-- Outer Flexible Layout Wrapper (Left Content + Right Navigation Sidebar) -->
+<div class="eess-card-portal-wrapper">
 
     <!-- LEFT CONTENT PANEL (Dynamic Views) -->
-    <div id="eess-portal-content-panel" style="flex: 1 1 660px; min-width: 320px; order: 1; background: #ffffff; border-radius: 20px; border: 1px solid #e2e8f0; box-shadow: 0 10px 30px rgba(15,23,42,0.08); padding: 24px; box-sizing: border-box;">
+    <div id="eess-portal-content-panel" class="eess-portal-left-content">
 
         <!-- VIEW 1: MAIN SERVICE WIZARD (DEFAULT) -->
         <div id="pv-view-wizard" style="display: block;">
@@ -73,8 +174,9 @@ $required_fields = (array) ($card_settings['required_fields'] ?? array('guardian
             <!-- STEP 1: SEARCH & IDENTIFY STUDENT -->
             <div id="w-panel-step-1" style="display: block;">
                 <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px; margin-bottom: 18px;">
-                    <label style="font-size: 13px; font-weight: 800; color: #0f172a; display: block; margin-bottom: 6px;">أدخل اسم الطالب المسجل بالمدرسة للبحث:</label>
-                    <input type="text" id="w_student_name_input" onkeyup="wDebounceSearchName()" placeholder="ابحث باسم الطالب..." style="width: 100%; height: 44px; border-radius: 10px; border: 1.5px solid #cbd5e1; padding: 0 14px; font-size: 13px; font-weight: 700; box-sizing: border-box; outline: none; transition: border-color 0.2s;">
+                    <label style="font-size: 13px; font-weight: 800; color: #0f172a; display: block; margin-bottom: 6px;">أدخل اسم الطالب الكامل المسجل بالمدرسة للبحث:</label>
+                    <input type="text" id="w_student_name_input" onkeyup="wDebounceSearchName()" placeholder="أدخل اسم الطالب الكامل..." style="width: 100%; height: 44px; border-radius: 10px; border: 1.5px solid #cbd5e1; padding: 0 14px; font-size: 13px; font-weight: 700; box-sizing: border-box; outline: none; transition: border-color 0.2s;">
+                    <div style="font-size: 11px; color: #64748b; margin-top: 6px;">تنبيه: تظهر اقتراحات الطالب فقط عند إدخال اسم الطالب الكامل (الثلاثي على الأقل).</div>
                 </div>
 
                 <div id="w-search-suggestions" style="display: none; margin-bottom: 18px;"></div>
@@ -118,7 +220,7 @@ $required_fields = (array) ($card_settings['required_fields'] ?? array('guardian
                         <div id="w_missing_fields_render_box"></div>
 
                         <div style="margin-top: 14px; text-align: left;">
-                            <button type="submit" id="w_btn_save_missing" style="height: 42px; padding: 0 24px; background: #854d0e; color: white; border: none; border-radius: 10px; font-weight: 800; font-size: 13px; cursor: pointer;">حفظ وتحديث البيانات الحالية ✓</button>
+                            <button type="submit" id="w_btn_save_missing" style="height: 42px; padding: 0 24px; background: #854d0e; color: white; border: none; border-radius: 10px; font-weight: 800; font-size: 13px; cursor: pointer;">حفظ وتحديث البيانات الحالية</button>
                         </div>
                     </form>
                 </div>
@@ -129,7 +231,7 @@ $required_fields = (array) ($card_settings['required_fields'] ?? array('guardian
                         <span>📷 رفع صورة شخصية رسمية معتمدة للطالب</span>
                     </div>
                     <p style="margin: 0 0 12px 0; font-size: 12px; color: #14532d; line-height: 1.5;">
-                        لإتمام طلب تصريح الخروج، يرجى رفع صورة شخصية رسمية خلفية بيضاء.
+                        الملف لا يحتوي على صورة معتمدة. يرجى رفع صورة شخصية خلفية بيضاء.
                     </p>
 
                     <div style="margin-bottom: 10px;">
@@ -236,7 +338,7 @@ $required_fields = (array) ($card_settings['required_fields'] ?? array('guardian
             </div>
         </div>
 
-        <!-- VIEW 2: REQUIRED DATA FOR UPDATE (SETTINGS VIEW) -->
+        <!-- VIEW 2: REQUIRED DATA FOR UPDATE (SETTINGS VIEW - 2 PER ROW GRID) -->
         <div id="pv-view-required-data" style="display: none;">
             <div style="border-bottom: 2px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 18px;">
                 <h3 style="margin: 0 0 4px 0; font-size: 18px; font-weight: 900; color: #0f172a;">📝 البيانات المطلوبة للتحديث</h3>
@@ -246,7 +348,7 @@ $required_fields = (array) ($card_settings['required_fields'] ?? array('guardian
             <form onsubmit="wSavePortalSettingsFromView(event)">
                 <input type="hidden" name="portal_mode" value="<?php echo esc_attr($portal_mode); ?>">
 
-                <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
+                <div class="eess-req-fields-grid" style="margin-bottom: 20px;">
                     <?php
                     $available_fields = array(
                         'guardian_phone' => 'رقم هاتف ولي الأمر (+971)',
@@ -261,7 +363,7 @@ $required_fields = (array) ($card_settings['required_fields'] ?? array('guardian
                     foreach ($available_fields as $fk => $flabel):
                         $chk = in_array($fk, $required_fields) ? 'checked' : '';
                     ?>
-                        <label style="display: flex; align-items: center; gap: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; cursor: pointer; font-size: 13px; font-weight: 800; color: #0f172a; transition: border-color 0.2s;">
+                        <label style="display: flex; align-items: center; gap: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; cursor: pointer; font-size: 12.5px; font-weight: 800; color: #0f172a; transition: border-color 0.2s;">
                             <input type="checkbox" name="required_fields[]" value="<?php echo esc_attr($fk); ?>" <?php echo $chk; ?> style="width: 18px; height: 18px;">
                             <span><?php echo esc_html($flabel); ?></span>
                         </label>
@@ -269,7 +371,7 @@ $required_fields = (array) ($card_settings['required_fields'] ?? array('guardian
                 </div>
 
                 <?php if ($is_admin): ?>
-                    <button type="submit" style="height: 44px; padding: 0 28px; background: #0f172a; color: white; border: none; border-radius: 10px; font-weight: 800; font-size: 13px; cursor: pointer;">حفظ الحقول المطلوبة ✓</button>
+                    <button type="submit" style="height: 44px; padding: 0 28px; background: #0f172a; color: white; border: none; border-radius: 10px; font-weight: 800; font-size: 13px; cursor: pointer;">حفظ البيانات المطلوبة</button>
                 <?php else: ?>
                     <div style="font-size: 12px; color: #991b1b; background: #fef2f2; padding: 10px; border-radius: 8px;">تنبيه: تعديل الإعدادات متاح فقط لمشرفي النظام.</div>
                 <?php endif; ?>
@@ -308,14 +410,14 @@ $required_fields = (array) ($card_settings['required_fields'] ?? array('guardian
                 </div>
 
                 <?php if ($is_admin): ?>
-                    <button type="submit" style="height: 44px; padding: 0 28px; background: #0f172a; color: white; border: none; border-radius: 10px; font-weight: 800; font-size: 13px; cursor: pointer;">حفظ نمط العمل ✓</button>
+                    <button type="submit" style="height: 44px; padding: 0 28px; background: #0f172a; color: white; border: none; border-radius: 10px; font-weight: 800; font-size: 13px; cursor: pointer;">حفظ نمط العمل</button>
                 <?php else: ?>
                     <div style="font-size: 12px; color: #991b1b; background: #fef2f2; padding: 10px; border-radius: 8px;">تنبيه: تعديل الإعدادات متاح فقط لمشرفي النظام.</div>
                 <?php endif; ?>
             </form>
         </div>
 
-        <!-- VIEW 4: EXIT CARD REQUESTS MANAGEMENT (MANAGEMENT VIEW) -->
+        <!-- VIEW 4: EXIT CARD REQUESTS MANAGEMENT (2 CARDS PER ROW GRID) -->
         <div id="pv-view-requests-management" style="display: none;">
             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 18px;">
                 <div>
@@ -325,36 +427,45 @@ $required_fields = (array) ($card_settings['required_fields'] ?? array('guardian
                 <button type="button" onclick="wLoadCardRequestsFull()" style="background: #f1f5f9; border: 1px solid #cbd5e1; padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 800; cursor: pointer;">تحديث القائمة ↺</button>
             </div>
 
-            <!-- List of Visual Cards for Requests -->
-            <div id="pv-requests-cards-container" style="display: grid; grid-template-columns: 1fr; gap: 14px;">
-                <div style="text-align: center; color: #64748b; padding: 20px; font-size: 13px;">جاري تحميل طلبات تصاريح الخروج...</div>
+            <!-- List of Visual Cards for Requests (2 Cards Per Row) -->
+            <div id="pv-requests-cards-container" class="eess-req-cards-grid">
+                <div style="text-align: center; color: #64748b; padding: 20px; font-size: 13px; grid-column: span 2;">جاري تحميل طلبات تصاريح الخروج...</div>
             </div>
         </div>
 
     </div>
 
-    <!-- RIGHT NAVIGATION SIDEBAR (Navigation Items ONLY) -->
-    <div id="eess-portal-nav-sidebar" style="flex: 0 0 280px; width: 280px; max-width: 100%; order: 2; background: #ffffff; border-radius: 20px; border: 1px solid #e2e8f0; box-shadow: 0 10px 30px rgba(15,23,42,0.08); padding: 18px; box-sizing: border-box;">
+    <!-- RIGHT NAVIGATION SIDEBAR (Positioned on RIGHT with Professional SVG Icons) -->
+    <div id="eess-portal-nav-sidebar" class="eess-portal-right-sidebar">
 
         <div style="font-size: 14px; font-weight: 900; color: #0f172a; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; gap: 8px;">
-            <span>🧭 القائمة العامة للبوابة</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0f172a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>
+            <span>القائمة العامة للبوابة</span>
         </div>
 
         <div style="display: flex; flex-direction: column; gap: 8px;" id="sb-nav-items-list">
-            <button type="button" class="sb-nav-btn active" onclick="wSwitchPortalView('pv-view-wizard', this)" style="width: 100%; text-align: right; background: #881337; color: white; border: none; padding: 12px 14px; border-radius: 12px; font-weight: 800; font-size: 13px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 8px;">
-                <span>🎓</span> <span>تقديم طلب / تحديث بيانات</span>
+            <!-- Item 1: Service Wizard -->
+            <button type="button" class="sb-nav-btn active" onclick="wSwitchPortalView('pv-view-wizard', this)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg>
+                <span>تقديم طلب / تحديد الطالب</span>
             </button>
 
-            <button type="button" class="sb-nav-btn" onclick="wSwitchPortalView('pv-view-required-data', this)" style="width: 100%; text-align: right; background: #f8fafc; color: #334155; border: 1px solid #e2e8f0; padding: 12px 14px; border-radius: 12px; font-weight: 800; font-size: 13px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 8px;">
-                <span>📝</span> <span>البيانات المطلوبة للتحديث</span>
+            <!-- Item 2: Required Data for Update -->
+            <button type="button" class="sb-nav-btn" onclick="wSwitchPortalView('pv-view-required-data', this)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                <span>البيانات المطلوبة للتحديث</span>
             </button>
 
-            <button type="button" class="sb-nav-btn" onclick="wSwitchPortalView('pv-view-operating-mode', this)" style="width: 100%; text-align: right; background: #f8fafc; color: #334155; border: 1px solid #e2e8f0; padding: 12px 14px; border-radius: 12px; font-weight: 800; font-size: 13px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 8px;">
-                <span>⚙️</span> <span>نمط عمل البوابة</span>
+            <!-- Item 3: Portal Operating Mode -->
+            <button type="button" class="sb-nav-btn" onclick="wSwitchPortalView('pv-view-operating-mode', this)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                <span>نمط عمل البوابة</span>
             </button>
 
-            <button type="button" class="sb-nav-btn" onclick="wSwitchPortalView('pv-view-requests-management', this)" style="width: 100%; text-align: right; background: #f8fafc; color: #334155; border: 1px solid #e2e8f0; padding: 12px 14px; border-radius: 12px; font-weight: 800; font-size: 13px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 8px;">
-                <span>📋</span> <span>طلبات تصاريح الخروج</span>
+            <!-- Item 4: Exit Permit Requests -->
+            <button type="button" class="sb-nav-btn" onclick="wSwitchPortalView('pv-view-requests-management', this)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="M7 15h0M2 9.5h20"></path></svg>
+                <span>طلبات تصاريح الخروج</span>
             </button>
         </div>
 
@@ -377,12 +488,33 @@ $required_fields = (array) ($card_settings['required_fields'] ?? array('guardian
     </div>
 </div>
 
+<!-- IN-SYSTEM DELETE CONFIRMATION MODAL -->
+<div id="eess-delete-confirm-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.65); z-index: 999999; align-items: center; justify-content: center; padding: 15px; box-sizing: border-box;">
+    <div style="background: white; border-radius: 20px; max-width: 440px; width: 100%; padding: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); direction: rtl; font-family: 'Cairo', sans-serif; text-align: center;">
+        <div style="width: 56px; height: 56px; background: #fee2e2; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px auto; color: #dc2626;">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        </div>
+        <h3 style="margin: 0 0 6px 0; font-size: 17px; font-weight: 900; color: #0f172a;">تأكيد حذف طلب تصريح الخروج</h3>
+        <p style="margin: 0 0 14px 0; font-size: 13px; color: #475569; line-height: 1.5;">
+            هل أنت أكر من حذف هذا الطلب للطالب <strong id="eess_del_student_name" style="color: #881337;">---</strong>؟
+        </p>
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px; font-size: 11.5px; color: #64748b; margin-bottom: 18px; line-height: 1.5;">
+            تنبيه أمني: سيتم حذف بيانات الطلب فقط، ولن يتم تعديل أو حذف سجل الطالب الرئيسي بقاعدة البيانات.
+        </div>
+        <div style="display: flex; gap: 10px; justify-content: center;">
+            <button type="button" onclick="wCloseDeleteModal()" style="height: 40px; padding: 0 22px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 10px; font-weight: 800; font-size: 12.5px; cursor: pointer;">إلغاء</button>
+            <button type="button" id="eess_btn_confirm_delete" onclick="wExecuteConfirmDelete()" style="height: 40px; padding: 0 22px; background: #dc2626; color: white; border: none; border-radius: 10px; font-weight: 800; font-size: 12.5px; cursor: pointer;">تأكيد حذف الطلب</button>
+        </div>
+    </div>
+</div>
+
 <script>
 let wCurrentStep = 1;
 let wSelectedStudent = null;
 let wVerifiedData = null;
 let wSearchTimeout = null;
 let wSubmitting = false;
+let wPendingDeleteReqId = null;
 
 // Signature Canvas
 let wCanvas = null;
@@ -418,6 +550,28 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+function eessShowToast(message, type) {
+    const toast = document.getElementById('eess-toast-notification');
+    const msgEl = document.getElementById('eess-toast-message');
+    const iconEl = document.getElementById('eess-toast-icon');
+
+    if (!toast) return;
+
+    msgEl.innerText = message;
+    if (type === 'error') {
+        toast.style.borderRightColor = '#ef4444';
+        iconEl.innerText = '✕';
+    } else {
+        toast.style.borderRightColor = '#16a34a';
+        iconEl.innerText = '✓';
+    }
+
+    toast.style.display = 'flex';
+    setTimeout(function() {
+        toast.style.display = 'none';
+    }, 3500);
+}
+
 function wSwitchPortalView(viewId, btnEl) {
     document.querySelectorAll('#pv-view-wizard, #pv-view-required-data, #pv-view-operating-mode, #pv-view-requests-management').forEach(el => {
         el.style.display = 'none';
@@ -426,13 +580,15 @@ function wSwitchPortalView(viewId, btnEl) {
     if (target) target.style.display = 'block';
 
     document.querySelectorAll('.sb-nav-btn').forEach(btn => {
+        btn.classList.remove('active');
         btn.style.background = '#f8fafc';
         btn.style.color = '#334155';
         btn.style.border = '1px solid #e2e8f0';
     });
     if (btnEl) {
+        btnEl.classList.add('active');
         btnEl.style.background = '#881337';
-        btnEl.style.color = 'white';
+        btnEl.style.color = '#ffffff';
         btnEl.style.border = 'none';
     }
 
@@ -465,7 +621,9 @@ function wSearchStudentName() {
     const alertBox = document.getElementById('w-alert-box');
     alertBox.style.display = 'none';
 
-    if (val.length < 1) {
+    const words = val.split(' ').filter(w => w.length > 0);
+    // Suppress suggestions until complete full student name (3+ words) is typed
+    if (words.length < 3) {
         suggestions.style.display = 'none';
         return;
     }
@@ -488,7 +646,7 @@ function wSearchStudentName() {
             html += '</div>';
             suggestions.innerHTML = html;
         } else {
-            suggestions.innerHTML = '<div style="background:#fef2f2; border:1px solid #fecdd3; border-radius:10px; padding:12px; color:#991b1b; font-size:12px; font-weight:700; text-align:center;">' + (res.data || 'لم يتم العثور على طالب يطابق الاسم المدخل.') + '</div>';
+            suggestions.innerHTML = '<div style="background:#fef2f2; border:1px solid #fecdd3; border-radius:10px; padding:12px; color:#991b1b; font-size:12px; font-weight:700; text-align:center;">' + (res.data || 'لم يتم العثور على طالب يطابق الاسم الكامل المدخل.') + '</div>';
         }
     });
 }
@@ -519,10 +677,7 @@ function wVerifyStudentIdentity() {
     photoContainer.style.display = 'none';
 
     if (!codeVal) {
-        alertBox.style.display = 'block';
-        alertBox.style.background = '#fef2f2';
-        alertBox.style.color = '#991b1b';
-        alertBox.innerText = 'يرجى إدخال كود الطالب أو الهوية الوطنية.';
+        eessShowToast('يرجى إدخال كود الطالب أو الهوية الوطنية.', 'error');
         return;
     }
 
@@ -586,10 +741,7 @@ function wVerifyStudentIdentity() {
             panel.style.display = 'block';
 
         } else {
-            alertBox.style.display = 'block';
-            alertBox.style.background = '#fef2f2';
-            alertBox.style.color = '#991b1b';
-            alertBox.innerText = res.data || 'رمز التحقق غير مطابق للبيانات المسجلة.';
+            eessShowToast(res.data || 'رمز التحقق غير مطابق للبيانات المسجلة.', 'error');
         }
     });
 }
@@ -669,20 +821,20 @@ function wSubmitMissingData(e) {
         contentType: false,
         success: function(res) {
             btn.disabled = false;
-            btn.innerText = 'حفظ وتحديث البيانات الحالية ✓';
+            btn.innerText = 'حفظ وتحديث البيانات الحالية';
 
             if (res.success) {
-                alert(res.data.message || 'تم حفظ البيانات بنجاح.');
+                eessShowToast(res.data.message || 'تم حغظ وتحديث البيانات بنجاح.', 'success');
                 document.getElementById('w-missing-data-container').style.display = 'none';
                 wVerifyStudentIdentity();
             } else {
-                alert('خطأ: ' + (res.data || 'فشل حفظ البيانات.'));
+                eessShowToast(res.data || 'فشل حفظ البيانات.', 'error');
             }
         },
         error: function() {
             btn.disabled = false;
-            btn.innerText = 'حفظ وتحديث البيانات الحالية ✓';
-            alert('حدث خطأ في الاتصال بالسيرفر.');
+            btn.innerText = 'حفظ وتحديث البيانات الحالية';
+            eessShowToast('حدث خطأ في الاتصال بالسيرفر.', 'error');
         }
     });
 }
@@ -803,17 +955,18 @@ function wSubmitExitCardFinal() {
                 document.getElementById('w-progress-bar').style.display = 'none';
                 document.getElementById('w_success_ref_no').innerText = res.data.reference_no;
                 document.getElementById('w-panel-success').style.display = 'block';
+                eessShowToast('تم تقديم طلب تصريح الخروج بنجاح.', 'success');
             } else {
                 btn.disabled = false;
                 btn.innerHTML = 'تأكيد وإرسال الطلب النهائي ✓';
-                alert('حدث خطأ أثناء إرسال الطلب: ' + (res.data || 'فشل الحفظ'));
+                eessShowToast('حدث خطأ أثناء إرسال الطلب: ' + (res.data || 'فشل الحفظ'), 'error');
             }
         },
         error: function() {
             wSubmitting = false;
             btn.disabled = false;
             btn.innerHTML = 'تأكيد وإرسال الطلب النهائي ✓';
-            alert('حدث خطأ في الاتصال بالسيرفر أثناء إرسال الطلب.');
+            eessShowToast('حدث خطأ في الاتصال بالسيرفر أثناء إرسال الطلب.', 'error');
         }
     });
 }
@@ -833,10 +986,10 @@ function wSavePortalSettingsFromView(e) {
         contentType: false,
         success: function(res) {
             if (res.success) {
-                alert(res.data.message || 'تم حفظ الإعدادات بنجاح.');
-                location.reload();
+                eessShowToast(res.data.message || 'تم حفظ الإعدادات بنجاح.', 'success');
+                setTimeout(() => location.reload(), 1200);
             } else {
-                alert('خطأ: ' + (res.data || 'فشل الحفظ'));
+                eessShowToast('خطأ: ' + (res.data || 'فشل الحفظ'), 'error');
             }
         }
     });
@@ -876,47 +1029,59 @@ function wLoadCardRequestsFull() {
 
                 let waUrl = 'https://api.whatsapp.com/send?phone=' + encodeURIComponent(r.wa_phone) + '&text=' + encodeURIComponent(waText);
 
-                html += '<div style="background:#f8fafc; border:1.5px solid #e2e8f0; border-radius:16px; padding:18px; box-shadow:0 4px 12px rgba(0,0,0,0.03); display:flex; flex-direction:column; gap:10px;">';
-                html += '<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">';
+                html += '<div style="background:#f8fafc; border:1.5px solid #e2e8f0; border-radius:16px; padding:16px; box-shadow:0 4px 12px rgba(0,0,0,0.03); display:flex; flex-direction:column; justify-content:space-between; gap:10px;">';
+
                 html += '<div>';
-                html += '<span style="font-size:15px; font-weight:900; color:#0f172a;">' + r.student_name + '</span> ';
-                html += '<span style="font-size:12px; color:#881337; font-weight:800;">(' + r.student_code + ')</span>';
+                html += '<div style="display:flex; justify-content:space-between; align-items:flex-start; gap:6px; margin-bottom:6px;">';
+                html += '<div>';
+                html += '<div style="font-size:14.5px; font-weight:900; color:#0f172a; line-height:1.3;">' + r.student_name + '</div>';
+                html += '<div style="font-size:11.5px; color:#881337; font-weight:800; margin-top:2px;">كود الطالب: ' + r.student_code + '</div>';
                 html += '</div>';
-                html += '<div style="display:flex; gap:6px;">';
-                html += '<span style="background:' + badgeBg + '; color:' + badgeColor + '; padding:3px 10px; border-radius:8px; font-size:11px; font-weight:800;">' + r.status_label + '</span>';
-                html += '<span style="background:' + vbadgeBg + '; color:' + vbadgeColor + '; padding:3px 10px; border-radius:8px; font-size:11px; font-weight:800;">' + r.verification_label + '</span>';
+                html += '<div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">';
+                html += '<span style="background:' + badgeBg + '; color:' + badgeColor + '; padding:2px 8px; border-radius:6px; font-size:10.5px; font-weight:800;">' + r.status_label + '</span>';
+                html += '<span style="background:' + vbadgeBg + '; color:' + vbadgeColor + '; padding:2px 8px; border-radius:6px; font-size:10.5px; font-weight:800;">' + r.verification_label + '</span>';
                 html += '</div></div>';
 
-                html += '<div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; font-size:12px; color:#475569; line-height:1.6;">';
-                html += '<div><strong>الصف والشعبة:</strong> ' + r.class_name + ' (' + r.section + ')</div>';
-                html += '<div><strong>الرقم المرجعي:</strong> <span style="font-family:monospace; font-weight:800; color:#0f172a;">' + r.reference_no + '</span></div>';
-                html += '<div><strong>ولي الأمر:</strong> ' + r.parent_name + '</div>';
-                html += '<div><strong>هاتف التواصل:</strong> <span style="direction:ltr; display:inline-block;">' + r.parent_phone + '</span></div>';
-                html += '<div><strong>تاريخ الطلب:</strong> ' + r.created_at + '</div>';
+                html += '<div style="font-size:11.5px; color:#475569; line-height:1.6; margin-bottom:4px;">';
+                html += '<div><strong>الصف:</strong> ' + r.class_name + ' (' + r.section + ') | <strong>المرجع:</strong> <span style="font-family:monospace;">' + r.reference_no + '</span></div>';
+                html += '<div><strong>ولي الأمر:</strong> ' + r.parent_name + ' (' + r.parent_phone + ')</div>';
+                html += '</div>';
                 html += '</div>';
 
-                html += '<div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; border-top:1px solid #e2e8f0; padding-top:12px; margin-top:2px;">';
-                html += '<button type="button" onclick="wViewCardRequestDetails(' + r.id + ')" style="background:#0f172a; color:white; border:none; padding:6px 12px; border-radius:8px; font-size:11.5px; font-weight:800; cursor:pointer;">👁️ عرض/مراجعة</button>';
+                // Standardized Action Buttons Row
+                html += '<div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px; border-top:1px solid #e2e8f0; padding-top:10px; margin-top: auto;">';
 
+                // Button 1: View / Review
+                html += '<button type="button" class="eess-btn-action" onclick="wViewCardRequestDetails(' + r.id + ')" style="background:#0f172a; color:white;">';
+                html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+                html += '<span>عرض/مراجعة</span></button>';
+
+                // Button 2: WhatsApp Verification
                 if (r.wa_phone) {
-                    html += '<a href="' + waUrl + '" target="_blank" style="background:#25D366; color:white; text-decoration:none; padding:6px 12px; border-radius:8px; font-size:11.5px; font-weight:800; display:inline-flex; align-items:center; gap:4px;">💬 تحقق عبر واتساب</a>';
+                    html += '<a href="' + waUrl + '" target="_blank" class="eess-btn-action" style="background:#25D366; color:white;">';
+                    html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.3 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>';
+                    html += '<span>تحقق واتساب</span></a>';
+                } else {
+                    html += '<span class="eess-btn-action" style="background:#cbd5e1; color:#64748b;">لا يوجد هاتف</span>';
                 }
 
-                html += '<select onchange="wChangeVerificationStatus(' + r.id + ', this.value)" style="height:32px; border-radius:8px; border:1px solid #cbd5e1; font-size:11px; font-weight:700; padding:0 6px;">';
-                html += '<option value="pending_verification" ' + (r.verification_status==='pending_verification'?'selected':'') + '>قيد التحقق</option>';
-                html += '<option value="parent_confirmed" ' + (r.verification_status==='parent_confirmed'?'selected':'') + '>تم التأكيد من ولي الأمر</option>';
-                html += '<option value="parent_not_confirmed" ' + (r.verification_status==='parent_not_confirmed'?'selected':'') + '>لم يتم التأكيد</option>';
-                html += '</select>';
+                // Button 3: Print Card
+                html += '<button type="button" class="eess-btn-action" onclick="wPrintStudentCard(' + r.student_id + ')" style="background:#881337; color:white;">';
+                html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>';
+                html += '<span>طباعة البطاقة</span></button>';
 
-                html += '<button type="button" onclick="wPrintStudentCard(' + r.student_id + ')" style="background:#881337; color:white; border:none; padding:6px 12px; border-radius:8px; font-size:11.5px; font-weight:800; cursor:pointer;">🪪 طباعة البطاقة</button>';
-                html += '<button type="button" onclick="wDeleteCardRequest(' + r.id + ', \'' + r.student_name.replace(/'/g, "\\'") + '\')" style="background:#fee2e2; color:#991b1b; border:1px solid #fecdd3; padding:6px 12px; border-radius:8px; font-size:11.5px; font-weight:800; cursor:pointer;">🗑️ حذف الطلب</button>';
+                // Button 4: Delete Request
+                html += '<button type="button" class="eess-btn-action" onclick="wPromptDeleteRequest(' + r.id + ', \'' + r.student_name.replace(/'/g, "\\'") + '\')" style="background:#fee2e2; color:#991b1b; border:1px solid #fecdd3;">';
+                html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
+                html += '<span>حذف الطلب</span></button>';
+
                 html += '</div>';
 
                 html += '</div>';
             });
             box.innerHTML = html;
         } else {
-            box.innerHTML = '<div style="text-align:center; color:#64748b; padding:20px; font-size:12.5px;">لا توجد طلبات تصاريح خروج مسجلة حتى الآن.</div>';
+            box.innerHTML = '<div style="text-align:center; color:#64748b; padding:20px; font-size:12.5px; grid-column: span 2;">لا توجد طلبات تصاريح خروج مسجلة حتى الآن.</div>';
         }
     });
 }
@@ -930,29 +1095,47 @@ function wChangeVerificationStatus(reqId, vstatus) {
         nonce: '<?php echo $admin_nonce; ?>'
     }, function(res) {
         if (res.success) {
+            eessShowToast('تم تحديث حالة تحقق ولي الأمر بنجاح.', 'success');
             wLoadCardRequestsFull();
         } else {
-            alert('فشل تحديث حالة التحقق: ' + (res.data || 'خطأ'));
+            eessShowToast('فشل تحديث حالة التحقق: ' + (res.data || 'خطأ'), 'error');
         }
     });
 }
 
-function wDeleteCardRequest(reqId, studentName) {
-    if (!confirm('هل أنت أكر من حذف هذا الطلب للطالب (' + studentName + ')؟\n\nتنبيه: سيتم حذف الطلب فقط ولن يتم حذف سجل الطالب نفسه من النظام.')) {
-        return;
-    }
+function wPromptDeleteRequest(reqId, studentName) {
+    wPendingDeleteReqId = reqId;
+    document.getElementById('eess_del_student_name').innerText = studentName;
+    document.getElementById('eess-delete-confirm-modal').style.display = 'flex';
+}
+
+function wCloseDeleteModal() {
+    wPendingDeleteReqId = null;
+    document.getElementById('eess-delete-confirm-modal').style.display = 'none';
+}
+
+function wExecuteConfirmDelete() {
+    if (!wPendingDeleteReqId) return;
+
+    const btn = document.getElementById('eess_btn_confirm_delete');
+    btn.disabled = true;
+    btn.innerText = 'جاري الحذف...';
 
     jQuery.post('<?php echo $ajax_url; ?>', {
         action: 'sm_manage_card_requests',
         action_type: 'delete',
-        request_id: reqId,
+        request_id: wPendingDeleteReqId,
         nonce: '<?php echo $admin_nonce; ?>'
     }, function(res) {
+        btn.disabled = false;
+        btn.innerText = 'تأكيد حذف الطلب';
+        wCloseDeleteModal();
+
         if (res.success) {
-            alert(res.data.message || 'تم حذف الطلب بنجاح.');
+            eessShowToast(res.data.message || 'تم حذف طلب تصريح الخروج بنجاح مع الحفاظ على سجل الطالب.', 'success');
             wLoadCardRequestsFull();
         } else {
-            alert('فشل حذف الطلب: ' + (res.data || 'خطأ'));
+            eessShowToast('فشل حذف الطلب: ' + (res.data || 'خطأ'), 'error');
         }
     });
 }
@@ -989,7 +1172,7 @@ function wViewCardRequestDetails(reqId) {
             document.getElementById('modal_req_body').innerHTML = html;
             document.getElementById('w-req-view-modal').style.display = 'flex';
         } else {
-            alert('فشل جلب تفاصيل الطلب.');
+            eessShowToast('فشل جلب تفاصيل الطلب.', 'error');
         }
     });
 }
@@ -1003,7 +1186,7 @@ function wUpdateReqStatus(reqId, status) {
         nonce: '<?php echo $admin_nonce; ?>'
     }, function(res) {
         if (res.success) {
-            alert('تم تحديث حالة الطلب بنجاح.');
+            eessShowToast('تم تحديث حالة الطلب بنجاح.', 'success');
             document.getElementById('w-req-view-modal').style.display = 'none';
             wLoadCardRequestsFull();
         }
