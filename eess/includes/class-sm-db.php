@@ -1153,6 +1153,27 @@ class SM_DB {
         }
     }
 
+    public static function ensure_exit_card_requests_columns_exist() {
+        global $wpdb;
+        $table = "{$wpdb->prefix}sm_exit_card_requests";
+
+        if ($wpdb->get_var("SHOW TABLES LIKE '$table'") !== $table) {
+            return;
+        }
+
+        $cols = array(
+            'verification_status' => "VARCHAR(50) DEFAULT 'pending_verification'",
+            'verified_at'          => "DATETIME DEFAULT NULL"
+        );
+
+        foreach ($cols as $col => $def) {
+            $check = $wpdb->get_results("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '$table' AND COLUMN_NAME = '$col'");
+            if (empty($check)) {
+                $wpdb->query("ALTER TABLE $table ADD COLUMN $col $def");
+            }
+        }
+    }
+
     // Student Metadata
     public static function update_student_meta($student_id, $key, $value) {
         global $wpdb;
