@@ -25,308 +25,357 @@ $portal_mode = $card_settings['portal_mode'] ?? 'card_application';
 $required_fields = (array) ($card_settings['required_fields'] ?? array('guardian_phone', 'dob'));
 ?>
 
-<!-- Outer Flexible Layout Wrapper (Main Wizard + Sidebar) -->
+<!-- Outer Flexible Layout Wrapper (Left Content Panel + Right Navigation Sidebar) -->
 <div class="eess-card-portal-wrapper" style="max-width: 1100px; margin: 20px auto; display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; font-family: 'Cairo', sans-serif; direction: rtl; box-sizing: border-box; color: #0f172a;">
 
-    <!-- MAIN CARD WIZARD CONTAINER (Slightly Wider) -->
-    <div class="eess-card-wizard-app" style="flex: 1 1 620px; min-width: 320px; background: #ffffff; border-radius: 20px; border: 1px solid #e2e8f0; box-shadow: 0 10px 30px rgba(15,23,42,0.08); padding: 24px; box-sizing: border-box;">
+    <!-- LEFT CONTENT PANEL (Dynamic Views) -->
+    <div id="eess-portal-content-panel" style="flex: 1 1 660px; min-width: 320px; order: 1; background: #ffffff; border-radius: 20px; border: 1px solid #e2e8f0; box-shadow: 0 10px 30px rgba(15,23,42,0.08); padding: 24px; box-sizing: border-box;">
 
-        <!-- Header & Branding Banner -->
-        <div style="text-align: center; border-bottom: 2px solid #f1f5f9; padding-bottom: 18px; margin-bottom: 20px;">
-            <div style="width: 72px; height: 72px; margin: 0 auto 10px auto; background: #ffffff; border-radius: 16px; padding: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); border: 1px solid #cbd5e1; display: flex; align-items: center; justify-content: center;">
-                <img src="<?php echo esc_url($sys_logo); ?>" style="width: 100%; height: 100%; object-fit: contain; border-radius: 12px;" alt="Logo">
-            </div>
-            <h2 style="margin: 0 0 4px 0; font-size: 20px; font-weight: 900; color: #0f172a;"><?php echo esc_html($school_name); ?></h2>
-            <div style="font-size: 13px; color: #881337; font-weight: 800;" id="w_portal_subtitle_text">
-                <?php echo ($portal_mode === 'update_only') ? 'بوابة تحديث بيانات الطلاب المعتمدة' : 'بوابة تقديم ومتابعة طلبات بطاقات تصريح الخروج الرقمية'; ?>
-            </div>
-        </div>
-
-        <!-- Multi-Step Progress Indicator -->
-        <div id="w-progress-bar" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; position: relative;">
-            <div style="position: absolute; top: 50%; right: 10%; left: 10%; height: 3px; background: #e2e8f0; z-index: 1; transform: translateY(-50%);"></div>
-            <div id="w-progress-line" style="position: absolute; top: 50%; right: 10%; width: 0%; height: 3px; background: #881337; z-index: 1; transform: translateY(-50%); transition: width 0.3s ease;"></div>
-
-            <div class="w-step-item active" id="w-step-ind-1" style="position: relative; z-index: 2; text-align: center;">
-                <div class="w-step-num" style="width: 32px; height: 32px; border-radius: 50%; background: #881337; color: white; font-weight: 900; font-size: 13px; display: flex; align-items: center; justify-content: center; margin: 0 auto 4px auto;">1</div>
-                <div style="font-size: 11px; font-weight: 800; color: #881337;">تحديد الطالب</div>
-            </div>
-            <div class="w-step-item" id="w-step-ind-2" style="position: relative; z-index: 2; text-align: center;">
-                <div class="w-step-num" style="width: 32px; height: 32px; border-radius: 50%; background: #cbd5e1; color: #475569; font-weight: 900; font-size: 13px; display: flex; align-items: center; justify-content: center; margin: 0 auto 4px auto;">2</div>
-                <div style="font-size: 11px; font-weight: 800; color: #64748b;">التحقق والبيانات</div>
-            </div>
-            <div class="w-step-item" id="w-step-ind-3" style="position: relative; z-index: 2; text-align: center;">
-                <div class="w-step-num" style="width: 32px; height: 32px; border-radius: 50%; background: #cbd5e1; color: #475569; font-weight: 900; font-size: 13px; display: flex; align-items: center; justify-content: center; margin: 0 auto 4px auto;">3</div>
-                <div style="font-size: 11px; font-weight: 800; color: #64748b;">التوقيع والإقرار</div>
-            </div>
-            <div class="w-step-item" id="w-step-ind-4" style="position: relative; z-index: 2; text-align: center;">
-                <div class="w-step-num" style="width: 32px; height: 32px; border-radius: 50%; background: #cbd5e1; color: #475569; font-weight: 900; font-size: 13px; display: flex; align-items: center; justify-content: center; margin: 0 auto 4px auto;">4</div>
-                <div style="font-size: 11px; font-weight: 800; color: #64748b;">إرسال الطلب</div>
-            </div>
-        </div>
-
-        <!-- Alert / Message Container -->
-        <div id="w-alert-box" style="display: none; padding: 12px 16px; border-radius: 12px; font-size: 12.5px; font-weight: 700; margin-bottom: 18px; line-height: 1.5;"></div>
-
-        <!-- STEP 1: SEARCH & IDENTIFY STUDENT -->
-        <div id="w-panel-step-1" style="display: block;">
-            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px; margin-bottom: 18px;">
-                <label style="font-size: 13px; font-weight: 800; color: #0f172a; display: block; margin-bottom: 6px;">أدخل اسم الطالب المسجل بالمدرسة للبحث:</label>
-                <input type="text" id="w_student_name_input" onkeyup="wDebounceSearchName()" placeholder="ابحث باسم الطالب..." style="width: 100%; height: 44px; border-radius: 10px; border: 1.5px solid #cbd5e1; padding: 0 14px; font-size: 13px; font-weight: 700; box-sizing: border-box; outline: none; transition: border-color 0.2s;">
+        <!-- VIEW 1: MAIN SERVICE WIZARD (DEFAULT) -->
+        <div id="pv-view-wizard" style="display: block;">
+            <!-- Header & Branding Banner -->
+            <div style="text-align: center; border-bottom: 2px solid #f1f5f9; padding-bottom: 18px; margin-bottom: 20px;">
+                <div style="width: 72px; height: 72px; margin: 0 auto 10px auto; background: #ffffff; border-radius: 16px; padding: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); border: 1px solid #cbd5e1; display: flex; align-items: center; justify-content: center;">
+                    <img src="<?php echo esc_url($sys_logo); ?>" style="width: 100%; height: 100%; object-fit: contain; border-radius: 12px;" alt="Logo">
+                </div>
+                <h2 style="margin: 0 0 4px 0; font-size: 20px; font-weight: 900; color: #0f172a;"><?php echo esc_html($school_name); ?></h2>
+                <div style="font-size: 13px; color: #881337; font-weight: 800;" id="w_portal_subtitle_text">
+                    <?php echo ($portal_mode === 'update_only') ? 'بوابة تحديث بيانات الطلاب المعتمدة' : 'بوابة تقديم ومتابعة طلبات بطاقات تصريح الخروج الرقمية'; ?>
+                </div>
             </div>
 
-            <div id="w-search-suggestions" style="display: none; margin-bottom: 18px;"></div>
+            <!-- Multi-Step Progress Indicator -->
+            <div id="w-progress-bar" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; position: relative;">
+                <div style="position: absolute; top: 50%; right: 10%; left: 10%; height: 3px; background: #e2e8f0; z-index: 1; transform: translateY(-50%);"></div>
+                <div id="w-progress-line" style="position: absolute; top: 50%; right: 10%; width: 0%; height: 3px; background: #881337; z-index: 1; transform: translateY(-50%); transition: width 0.3s ease;"></div>
 
-            <!-- Selected Student Preview Box -->
-            <div id="w-selected-stu-box" style="display: none; background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 14px; padding: 16px; margin-bottom: 18px;">
-                <div style="font-size: 11px; color: #166534; font-weight: 800; margin-bottom: 4px;">✓ تم اختيار الطالب:</div>
-                <div style="font-size: 16px; font-weight: 900; color: #14532d; margin-bottom: 4px;" id="w_sel_stu_name"></div>
-                <div style="font-size: 12px; color: #15803d; font-weight: 700;" id="w_sel_stu_class"></div>
+                <div class="w-step-item active" id="w-step-ind-1" style="position: relative; z-index: 2; text-align: center;">
+                    <div class="w-step-num" style="width: 32px; height: 32px; border-radius: 50%; background: #881337; color: white; font-weight: 900; font-size: 13px; display: flex; align-items: center; justify-content: center; margin: 0 auto 4px auto;">1</div>
+                    <div style="font-size: 11px; font-weight: 800; color: #881337;">تحديد الطالب</div>
+                </div>
+                <div class="w-step-item" id="w-step-ind-2" style="position: relative; z-index: 2; text-align: center;">
+                    <div class="w-step-num" style="width: 32px; height: 32px; border-radius: 50%; background: #cbd5e1; color: #475569; font-weight: 900; font-size: 13px; display: flex; align-items: center; justify-content: center; margin: 0 auto 4px auto;">2</div>
+                    <div style="font-size: 11px; font-weight: 800; color: #64748b;">التحقق والبيانات</div>
+                </div>
+                <div class="w-step-item" id="w-step-ind-3" style="position: relative; z-index: 2; text-align: center;">
+                    <div class="w-step-num" style="width: 32px; height: 32px; border-radius: 50%; background: #cbd5e1; color: #475569; font-weight: 900; font-size: 13px; display: flex; align-items: center; justify-content: center; margin: 0 auto 4px auto;">3</div>
+                    <div style="font-size: 11px; font-weight: 800; color: #64748b;">التوقيع والإقرار</div>
+                </div>
+                <div class="w-step-item" id="w-step-ind-4" style="position: relative; z-index: 2; text-align: center;">
+                    <div class="w-step-num" style="width: 32px; height: 32px; border-radius: 50%; background: #cbd5e1; color: #475569; font-weight: 900; font-size: 13px; display: flex; align-items: center; justify-content: center; margin: 0 auto 4px auto;">4</div>
+                    <div style="font-size: 11px; font-weight: 800; color: #64748b;">إرسال الطلب</div>
+                </div>
             </div>
 
-            <div style="display: flex; justify-content: flex-end;">
-                <button type="button" id="w_btn_next_1" disabled onclick="wGoToStep(2)" style="height: 44px; padding: 0 28px; background: #881337; color: white; border: none; border-radius: 10px; font-weight: 800; font-size: 13.5px; cursor: not-allowed; opacity: 0.5;">الانتقال للخطوة التالية ➔</button>
-            </div>
-        </div>
+            <!-- Alert / Message Container -->
+            <div id="w-alert-box" style="display: none; padding: 12px 16px; border-radius: 12px; font-size: 12.5px; font-weight: 700; margin-bottom: 18px; line-height: 1.5;"></div>
 
-        <!-- STEP 2: VERIFY STUDENT IDENTITY & UPDATE MISSING DATA -->
-        <div id="w-panel-step-2" style="display: none;">
-            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px; margin-bottom: 18px;">
-                <h4 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 800; color: #0f172a;">تأكيد التحقق من هوية الطالب</h4>
-                <p style="margin: 0 0 14px 0; font-size: 12px; color: #64748b; font-weight: 600;">يرجى إدخال كود الطالب المسجل أو رقم الهوية الوطنية للتحقق والأمان:</p>
-
-                <div style="margin-bottom: 12px;">
-                    <label style="font-size: 12px; font-weight: 700; color: #334155; display: block; margin-bottom: 4px;">كود الطالب أو رقم الهوية الوطنية <span style="color:#ef4444;">*</span></label>
-                    <input type="text" id="w_verify_code_input" placeholder="أدخل كود الطالب أو الهوية الوطنية..." style="width: 100%; height: 44px; border-radius: 10px; border: 1.5px solid #cbd5e1; padding: 0 14px; font-size: 13px; font-weight: 700; box-sizing: border-box;">
+            <!-- STEP 1: SEARCH & IDENTIFY STUDENT -->
+            <div id="w-panel-step-1" style="display: block;">
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px; margin-bottom: 18px;">
+                    <label style="font-size: 13px; font-weight: 800; color: #0f172a; display: block; margin-bottom: 6px;">أدخل اسم الطالب المسجل بالمدرسة للبحث:</label>
+                    <input type="text" id="w_student_name_input" onkeyup="wDebounceSearchName()" placeholder="ابحث باسم الطالب..." style="width: 100%; height: 44px; border-radius: 10px; border: 1.5px solid #cbd5e1; padding: 0 14px; font-size: 13px; font-weight: 700; box-sizing: border-box; outline: none; transition: border-color 0.2s;">
                 </div>
 
-                <button type="button" onclick="wVerifyStudentIdentity()" id="w_btn_verify_id" style="width: 100%; height: 42px; background: #0f172a; color: white; border: none; border-radius: 10px; font-weight: 800; font-size: 13px; cursor: pointer;">تأكيد والتحقق من الهوية</button>
-            </div>
+                <div id="w-search-suggestions" style="display: none; margin-bottom: 18px;"></div>
 
-            <!-- Verification Result & Existing Status Panel -->
-            <div id="w-verified-status-panel" style="display: none; margin-bottom: 18px;"></div>
-
-            <!-- DYNAMIC MISSING REQUIRED DATA COMPLETION FORM -->
-            <div id="w-missing-data-container" style="display: none; background: #fffbe3; border: 1.5px solid #fde047; border-radius: 14px; padding: 18px; margin-bottom: 18px;">
-                <div style="font-size: 13.5px; font-weight: 900; color: #854d0e; margin-bottom: 8px;">
-                    ⚠️ يتطلب النظام استكمال البيانات المطلوبة التالية للطالب قبل المتابعة:
+                <!-- Selected Student Preview Box -->
+                <div id="w-selected-stu-box" style="display: none; background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 14px; padding: 16px; margin-bottom: 18px;">
+                    <div style="font-size: 11px; color: #166534; font-weight: 800; margin-bottom: 4px;">✓ تم اختيار الطالب:</div>
+                    <div style="font-size: 16px; font-weight: 900; color: #14532d; margin-bottom: 4px;" id="w_sel_stu_name"></div>
+                    <div style="font-size: 12px; color: #15803d; font-weight: 700;" id="w_sel_stu_class"></div>
                 </div>
 
-                <form id="w_missing_data_form" onsubmit="wSubmitMissingData(event)">
-                    <!-- Dynamic fields populated via JS based on missing_fields -->
-                    <div id="w_missing_fields_render_box"></div>
+                <div style="display: flex; justify-content: flex-end;">
+                    <button type="button" id="w_btn_next_1" disabled onclick="wGoToStep(2)" style="height: 44px; padding: 0 28px; background: #881337; color: white; border: none; border-radius: 10px; font-weight: 800; font-size: 13.5px; cursor: not-allowed; opacity: 0.5;">الانتقال للخطوة التالية ➔</button>
+                </div>
+            </div>
 
-                    <div style="margin-top: 14px; text-align: left;">
-                        <button type="submit" id="w_btn_save_missing" style="height: 42px; padding: 0 24px; background: #854d0e; color: white; border: none; border-radius: 10px; font-weight: 800; font-size: 13px; cursor: pointer;">حفظ وتحديث البيانات الحالية ✓</button>
+            <!-- STEP 2: VERIFY STUDENT IDENTITY & UPDATE MISSING DATA -->
+            <div id="w-panel-step-2" style="display: none;">
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px; margin-bottom: 18px;">
+                    <h4 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 800; color: #0f172a;">تأكيد التحقق من هوية الطالب</h4>
+                    <p style="margin: 0 0 14px 0; font-size: 12px; color: #64748b; font-weight: 600;">يرجى إدخال كود الطالب المسجل أو رقم الهوية الوطنية للتحقق والأمان:</p>
+
+                    <div style="margin-bottom: 12px;">
+                        <label style="font-size: 12px; font-weight: 700; color: #334155; display: block; margin-bottom: 4px;">كود الطالب أو رقم الهوية الوطنية <span style="color:#ef4444;">*</span></label>
+                        <input type="text" id="w_verify_code_input" placeholder="أدخل كود الطالب أو الهوية الوطنية..." style="width: 100%; height: 44px; border-radius: 10px; border: 1.5px solid #cbd5e1; padding: 0 14px; font-size: 13px; font-weight: 700; box-sizing: border-box;">
                     </div>
-                </form>
-            </div>
 
-            <!-- Mandatory Official Student Photo Upload Box (If Profile Photo Missing for Card Mode) -->
-            <div id="w-photo-upload-container" style="display: none; background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 14px; padding: 18px; margin-bottom: 18px;">
-                <div style="display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 13.5px; color: #166534; margin-bottom: 8px;">
-                    <span>📷 رفع صورة شخصية رسمية معتمدة للطالب</span>
-                </div>
-                <p style="margin: 0 0 12px 0; font-size: 12px; color: #14532d; line-height: 1.5;">
-                    لإتمام طلب تصريح الخروج، يرجى رفع صورة شخصية رسمية خلفية بيضاء.
-                </p>
-
-                <div style="margin-bottom: 10px;">
-                    <input type="file" id="w_student_photo_file" accept="image/jpeg,image/png,image/webp" onchange="wValidateStudentPhoto(this)" style="width: 100%; font-size: 12px; background: white; padding: 8px; border-radius: 8px; border: 1px solid #cbd5e1;">
+                    <button type="button" onclick="wVerifyStudentIdentity()" id="w_btn_verify_id" style="width: 100%; height: 42px; background: #0f172a; color: white; border: none; border-radius: 10px; font-weight: 800; font-size: 13px; cursor: pointer;">تأكيد والتحقق من الهوية</button>
                 </div>
 
-                <div id="w_photo_preview_box" style="display: none; margin-top: 10px; background: white; padding: 10px; border-radius: 10px; border: 1px solid #e2e8f0; text-align: center;">
-                    <img id="w_photo_preview_img" src="" style="width: 90px; height: 110px; object-fit: cover; border-radius: 8px; border: 2px solid #0f172a; margin-bottom: 6px;" alt="Student Photo Preview">
-                    <div style="font-size: 11px; color: #16a34a; font-weight: 800;" id="w_photo_status_msg">✓ تم معاينة الصورة بنجاح.</div>
-                </div>
-            </div>
+                <!-- Verification Result & Existing Status Panel -->
+                <div id="w-verified-status-panel" style="display: none; margin-bottom: 18px;"></div>
 
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <button type="button" onclick="wGoToStep(1)" style="height: 42px; padding: 0 20px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 10px; font-weight: 800; font-size: 12.5px; cursor: pointer;">➔ السابق</button>
-                <button type="button" id="w_btn_next_2" disabled onclick="wGoToStep(3)" style="height: 44px; padding: 0 28px; background: #881337; color: white; border: none; border-radius: 10px; font-weight: 800; font-size: 13.5px; cursor: not-allowed; opacity: 0.5;">المتابعة للإقرار والتوقيع ➔</button>
-            </div>
-        </div>
+                <!-- DYNAMIC MISSING REQUIRED DATA COMPLETION FORM -->
+                <div id="w-missing-data-container" style="display: none; background: #fffbe3; border: 1.5px solid #fde047; border-radius: 14px; padding: 18px; margin-bottom: 18px;">
+                    <div style="font-size: 13.5px; font-weight: 900; color: #854d0e; margin-bottom: 8px;">
+                        ⚠️ يتطلب النظام استكمال البيانات المطلوبة التالية للطالب قبل المتابعة:
+                    </div>
 
-        <!-- STEP 3: PARENT DECLARATION & ELECTRONIC SIGNATURE -->
-        <div id="w-panel-step-3" style="display: none;">
-            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px; margin-bottom: 18px;">
-                <h4 style="margin: 0 0 10px 0; font-size: 14px; font-weight: 800; color: #0f172a;">إقرار ولي الأمر والتوقيع الإلكتروني</h4>
+                    <form id="w_missing_data_form" onsubmit="wSubmitMissingData(event)">
+                        <div id="w_missing_fields_render_box"></div>
 
-                <div style="margin-bottom: 12px;">
-                    <label style="font-size: 12px; font-weight: 700; color: #334155; display: block; margin-bottom: 4px;">اسم ولي الأمر الثلاثي <span style="color:#ef4444;">*</span></label>
-                    <input type="text" id="w_parent_name" placeholder="أدخل الاسم الكامل لولي الأمر..." style="width: 100%; height: 42px; border-radius: 8px; border: 1px solid #cbd5e1; padding: 0 12px; font-size: 12.5px; box-sizing: border-box;">
+                        <div style="margin-top: 14px; text-align: left;">
+                            <button type="submit" id="w_btn_save_missing" style="height: 42px; padding: 0 24px; background: #854d0e; color: white; border: none; border-radius: 10px; font-weight: 800; font-size: 13px; cursor: pointer;">حفظ وتحديث البيانات الحالية ✓</button>
+                        </div>
+                    </form>
                 </div>
 
-                <div style="margin-bottom: 14px;">
-                    <label style="font-size: 12px; font-weight: 700; color: #334155; display: block; margin-bottom: 4px;">رقم هاتف التواصل <span style="color:#ef4444;">*</span></label>
-                    <div style="display: flex; align-items: center; gap: 6px; direction: ltr;">
-                        <span style="background: #e2e8f0; border: 1px solid #cbd5e1; padding: 10px 12px; border-radius: 8px; font-size: 13px; font-weight: 800; color: #0f172a;">+971</span>
-                        <input type="tel" id="w_parent_phone" placeholder="501234567" style="flex: 1; height: 42px; border-radius: 8px; border: 1px solid #cbd5e1; padding: 0 12px; font-size: 12.5px; box-sizing: border-box; text-align: left;">
+                <!-- Mandatory Official Student Photo Upload Box -->
+                <div id="w-photo-upload-container" style="display: none; background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 14px; padding: 18px; margin-bottom: 18px;">
+                    <div style="display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 13.5px; color: #166534; margin-bottom: 8px;">
+                        <span>📷 رفع صورة شخصية رسمية معتمدة للطالب</span>
+                    </div>
+                    <p style="margin: 0 0 12px 0; font-size: 12px; color: #14532d; line-height: 1.5;">
+                        لإتمام طلب تصريح الخروج، يرجى رفع صورة شخصية رسمية خلفية بيضاء.
+                    </p>
+
+                    <div style="margin-bottom: 10px;">
+                        <input type="file" id="w_student_photo_file" accept="image/jpeg,image/png,image/webp" onchange="wValidateStudentPhoto(this)" style="width: 100%; font-size: 12px; background: white; padding: 8px; border-radius: 8px; border: 1px solid #cbd5e1;">
+                    </div>
+
+                    <div id="w_photo_preview_box" style="display: none; margin-top: 10px; background: white; padding: 10px; border-radius: 10px; border: 1px solid #e2e8f0; text-align: center;">
+                        <img id="w_photo_preview_img" src="" style="width: 90px; height: 110px; object-fit: cover; border-radius: 8px; border: 2px solid #0f172a; margin-bottom: 6px;" alt="Student Photo Preview">
+                        <div style="font-size: 11px; color: #16a34a; font-weight: 800;" id="w_photo_status_msg">✓ تم معاينة الصورة بنجاح.</div>
                     </div>
                 </div>
 
-                <div style="background: #fffbe3; border: 1px solid #fde047; border-radius: 10px; padding: 14px; font-size: 11.5px; color: #854d0e; line-height: 1.6; margin-bottom: 14px;">
-                    <strong>تعهد وإقرار ولي الأمر الرسمي:</strong><br>
-                    أقر أنا ولي أمر الطالب المذكور أعلاه بطلبي الرسمي لإصدار بطاقة تصريح الخروج الرقمية للطالب. وأتحمل المسؤولية الكاملة عن خروج الطالب واستئذانه بموجب هذا التصريح.
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <button type="button" onclick="wGoToStep(1)" style="height: 42px; padding: 0 20px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 10px; font-weight: 800; font-size: 12.5px; cursor: pointer;">➔ السابق</button>
+                    <button type="button" id="w_btn_next_2" disabled onclick="wGoToStep(3)" style="height: 44px; padding: 0 28px; background: #881337; color: white; border: none; border-radius: 10px; font-weight: 800; font-size: 13.5px; cursor: not-allowed; opacity: 0.5;">المتابعة للإقرار والتوقيع ➔</button>
                 </div>
+            </div>
 
-                <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; font-size: 12px; font-weight: 800; color: #0f172a; margin-bottom: 16px;">
-                    <input type="checkbox" id="w_declaration_chk" onchange="wCheckStep3Valid()" style="width: 18px; height: 18px; margin-top: 1px;">
-                    <span>أقر وأوافق على كافة الشروط والالتزامات الواردة في الإقرار أعلاه *</span>
-                </label>
+            <!-- STEP 3: PARENT DECLARATION & ELECTRONIC SIGNATURE -->
+            <div id="w-panel-step-3" style="display: none;">
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px; margin-bottom: 18px;">
+                    <h4 style="margin: 0 0 10px 0; font-size: 14px; font-weight: 800; color: #0f172a;">إقرار ولي الأمر والتوقيع الإلكتروني</h4>
 
-                <div>
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                        <label style="font-size: 12px; font-weight: 800; color: #0f172a;">التوقيع الإلكتروني لولي الأمر <span style="color:#ef4444;">*</span></label>
-                        <button type="button" onclick="wClearSignature()" style="background: #fee2e2; color: #991b1b; border: none; padding: 2px 10px; border-radius: 6px; font-size: 11px; font-weight: 800; cursor: pointer;">مسح التوقيع ↺</button>
+                    <div style="margin-bottom: 12px;">
+                        <label style="font-size: 12px; font-weight: 700; color: #334155; display: block; margin-bottom: 4px;">اسم ولي الأمر الثلاثي <span style="color:#ef4444;">*</span></label>
+                        <input type="text" id="w_parent_name" placeholder="أدخل الاسم الكامل لولي الأمر..." style="width: 100%; height: 42px; border-radius: 8px; border: 1px solid #cbd5e1; padding: 0 12px; font-size: 12.5px; box-sizing: border-box;">
                     </div>
-                    <div style="border: 2px dashed #cbd5e1; border-radius: 12px; background: #ffffff; overflow: hidden; touch-action: none;">
-                        <canvas id="w-signature-pad" width="600" height="150" style="width: 100%; height: 140px; display: block; cursor: crosshair;"></canvas>
-                    </div>
-                </div>
-            </div>
 
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <button type="button" onclick="wGoToStep(2)" style="height: 42px; padding: 0 20px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 10px; font-weight: 800; font-size: 12.5px; cursor: pointer;">➔ السابق</button>
-                <button type="button" id="w_btn_next_3" disabled onclick="wGoToStep(4)" style="height: 44px; padding: 0 28px; background: #881337; color: white; border: none; border-radius: 10px; font-weight: 800; font-size: 13.5px; cursor: not-allowed; opacity: 0.5;">مراجعة ملخص الطلب ➔</button>
-            </div>
-        </div>
-
-        <!-- STEP 4: FINAL SUMMARY REVIEW & SUBMIT -->
-        <div id="w-panel-step-4" style="display: none;">
-            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px; margin-bottom: 18px;">
-                <h4 style="margin: 0 0 12px 0; font-size: 15px; font-weight: 900; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">ملخص وتأكيد طلب تصريح الخروج</h4>
-
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 12px; color: #334155; line-height: 1.6; margin-bottom: 14px;">
-                    <div><strong>اسم الطالب:</strong> <span id="w_sum_stu_name" style="color: #0f172a; font-weight: 800;">---</span></div>
-                    <div><strong>الصف والشعبة:</strong> <span id="w_sum_stu_class" style="color: #0f172a; font-weight: 800;">---</span></div>
-                    <div><strong>كود الطالب:</strong> <span id="w_sum_stu_code" style="color: #881337; font-weight: 800;">---</span></div>
-                    <div><strong>ولي الأمر:</strong> <span id="w_sum_parent_name" style="color: #0f172a; font-weight: 800;">---</span></div>
-                    <div><strong>هاتف التواصل:</strong> <span id="w_sum_parent_phone" style="color: #0f172a; font-weight: 800;">---</span></div>
-                    <div><strong>تاريخ الطلب:</strong> <span style="color: #0f172a; font-weight: 800;"><?php echo current_time('Y-m-d'); ?></span></div>
-                </div>
-
-                <div style="border-top: 1px solid #e2e8f0; padding-top: 10px;">
-                    <div style="font-size: 11.5px; font-weight: 800; color: #64748b; margin-bottom: 4px;">معاينة التوقيع الإلكتروني المعتمد:</div>
-                    <div style="background: white; border: 1px solid #cbd5e1; border-radius: 8px; padding: 6px; text-align: center;">
-                        <img id="w_sum_sig_img" src="" style="max-height: 60px; object-fit: contain;" alt="Signature Preview">
-                    </div>
-                </div>
-            </div>
-
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <button type="button" onclick="wGoToStep(3)" style="height: 42px; padding: 0 20px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 10px; font-weight: 800; font-size: 12.5px; cursor: pointer;">➔ تعديل البيانات</button>
-                <button type="button" id="w_btn_submit_final" onclick="wSubmitExitCardFinal()" style="height: 46px; padding: 0 32px; background: #16a34a; color: white; border: none; border-radius: 10px; font-weight: 900; font-size: 14px; cursor: pointer; box-shadow: 0 4px 12px rgba(22,163,74,0.25);">تأكيد وإرسال الطلب النهائي ✓</button>
-            </div>
-        </div>
-
-        <!-- SUBMISSION SUCCESS CONFIRMATION SCREEN -->
-        <div id="w-panel-success" style="display: none; text-align: center; padding: 20px 10px;">
-            <div style="width: 64px; height: 64px; background: #dcfce7; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #16a34a; margin-bottom: 14px; font-size: 28px; font-weight: 900;">✓</div>
-            <h3 style="margin: 0 0 6px 0; font-size: 20px; font-weight: 900; color: #15803d;">تم تقديم طلب تصريح الخروج بنجاح</h3>
-            <p style="font-size: 13px; color: #475569; margin: 0 0 16px 0;">تم تسجيل الطلب بالنظام وهو الآن قيد المراجعة المباشرة من قسم شؤون الطلاب.</p>
-
-            <div style="background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 14px; padding: 16px; max-width: 380px; margin: 0 auto 20px auto;">
-                <div style="font-size: 11px; color: #64748b; font-weight: 800; margin-bottom: 2px;">الرقم المرجعي للطلب:</div>
-                <div style="font-size: 22px; font-weight: 900; color: #881337; font-family: monospace; letter-spacing: 1px;" id="w_success_ref_no">EXT-2026-00000</div>
-            </div>
-
-            <button type="button" onclick="location.reload()" style="height: 42px; padding: 0 26px; background: #0f172a; color: white; border: none; border-radius: 10px; font-weight: 800; font-size: 13px; cursor: pointer;">الرجوع للصفحة الرئيسية</button>
-        </div>
-
-    </div>
-
-    <!-- SEPARATE RIGHT SIDEBAR CONTAINER (Settings, Required Data, Card Requests) -->
-    <div class="eess-card-portal-sidebar" style="flex: 0 0 320px; width: 320px; max-width: 100%; background: #ffffff; border-radius: 20px; border: 1px solid #e2e8f0; box-shadow: 0 10px 30px rgba(15,23,42,0.08); padding: 20px; box-sizing: border-box;">
-
-        <?php if ($is_admin): ?>
-            <!-- ADMIN CONTROLS: PORTAL SETTINGS -->
-            <div style="margin-bottom: 22px; border-bottom: 1px solid #f1f5f9; padding-bottom: 16px;">
-                <h3 style="margin: 0 0 12px 0; font-size: 15px; font-weight: 900; color: #0f172a; display: flex; align-items: center; gap: 8px;">
-                    <span>⚙️ إعدادات البوابة</span>
-                </h3>
-
-                <form id="eess_card_settings_form" onsubmit="wSavePortalSettings(event)">
-                    <!-- Portal Application Mode Control -->
                     <div style="margin-bottom: 14px;">
-                        <label style="font-size: 12px; font-weight: 800; color: #334155; display: block; margin-bottom: 6px;">نمط عمل البوابة (Portal Mode):</label>
-                        <select name="portal_mode" id="sb_portal_mode" style="width: 100%; height: 38px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 12px; font-weight: 700; padding: 0 10px;">
-                            <option value="card_application" <?php selected($portal_mode, 'card_application'); ?>>تقديم بطاقات تصريح الخروج</option>
-                            <option value="update_only" <?php selected($portal_mode, 'update_only'); ?>>تحديث بيانات الطلاب فقط</option>
-                        </select>
-                    </div>
-
-                    <!-- Required Data for Update Checkboxes -->
-                    <div style="margin-bottom: 14px;">
-                        <label style="font-size: 12px; font-weight: 800; color: #334155; display: block; margin-bottom: 6px;">البيانات المطلوبة للتحديث:</label>
-                        <div style="display: flex; flex-direction: column; gap: 6px; font-size: 11.5px; font-weight: 700; color: #475569; max-height: 180px; overflow-y: auto; padding: 8px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
-                            <?php
-                            $available_fields = array(
-                                'guardian_phone' => 'رقم هاتف ولي الأمر (+971)',
-                                'dob' => 'تاريخ الميلاد',
-                                'gender' => 'الجنس',
-                                'guardian_name' => 'اسم ولي الأمر',
-                                'emirate' => 'إمارة السكن',
-                                'address' => 'العنوان التفصيلي',
-                                'nationality' => 'الجنسية',
-                                'national_id' => 'رقم الهوية الوطنية'
-                            );
-                            foreach ($available_fields as $fk => $flabel):
-                                $chk = in_array($fk, $required_fields) ? 'checked' : '';
-                            ?>
-                                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
-                                    <input type="checkbox" name="required_fields[]" value="<?php echo esc_attr($fk); ?>" <?php echo $chk; ?>>
-                                    <span><?php echo esc_html($flabel); ?></span>
-                                </label>
-                            <?php endforeach; ?>
+                        <label style="font-size: 12px; font-weight: 700; color: #334155; display: block; margin-bottom: 4px;">رقم هاتف التواصل <span style="color:#ef4444;">*</span></label>
+                        <div style="display: flex; align-items: center; gap: 6px; direction: ltr;">
+                            <span style="background: #e2e8f0; border: 1px solid #cbd5e1; padding: 10px 12px; border-radius: 8px; font-size: 13px; font-weight: 800; color: #0f172a;">+971</span>
+                            <input type="tel" id="w_parent_phone" placeholder="501234567" style="flex: 1; height: 42px; border-radius: 8px; border: 1px solid #cbd5e1; padding: 0 12px; font-size: 12.5px; box-sizing: border-box; text-align: left;">
                         </div>
                     </div>
 
-                    <button type="submit" style="width: 100%; height: 36px; background: #0f172a; color: white; border: none; border-radius: 8px; font-weight: 800; font-size: 12px; cursor: pointer;">حفظ إعدادات البوابة ✓</button>
-                </form>
-            </div>
-        <?php else: ?>
-            <!-- PUBLIC VISITOR SIDEBAR INFO -->
-            <div style="margin-bottom: 20px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px;">
-                <h4 style="margin: 0 0 6px 0; font-size: 13.5px; font-weight: 900; color: #0f172a;">بوابة الخدمات الذاتية</h4>
-                <div style="font-size: 11.5px; color: #64748b; line-height: 1.6;">
-                    تتيح لك البوابة تحديث بيانات الطالب المسجل أو إرسال طلب تصريح خروج رسمي إلكترونياً.
+                    <div style="background: #fffbe3; border: 1px solid #fde047; border-radius: 10px; padding: 14px; font-size: 11.5px; color: #854d0e; line-height: 1.6; margin-bottom: 14px;">
+                        <strong>تعهد وإقرار ولي الأمر الرسمي:</strong><br>
+                        أقر أنا ولي أمر الطالب المذكور أعلاه بطلبي الرسمي لإصدار بطاقة تصريح الخروج الرقمية للطالب. وأتحمل المسؤولية الكاملة عن خروج الطالب واستئذانه بموجب هذا التصريح.
+                    </div>
+
+                    <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; font-size: 12px; font-weight: 800; color: #0f172a; margin-bottom: 16px;">
+                        <input type="checkbox" id="w_declaration_chk" onchange="wCheckStep3Valid()" style="width: 18px; height: 18px; margin-top: 1px;">
+                        <span>أقر وأوافق على كافة الشروط والالتزامات الواردة في الإقرار أعلاه *</span>
+                    </label>
+
+                    <div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <label style="font-size: 12px; font-weight: 800; color: #0f172a;">التوقيع الإلكتروني لولي الأمر <span style="color:#ef4444;">*</span></label>
+                            <button type="button" onclick="wClearSignature()" style="background: #fee2e2; color: #991b1b; border: none; padding: 2px 10px; border-radius: 6px; font-size: 11px; font-weight: 800; cursor: pointer;">مسح التوقيع ↺</button>
+                        </div>
+                        <div style="border: 2px dashed #cbd5e1; border-radius: 12px; background: #ffffff; overflow: hidden; touch-action: none;">
+                            <canvas id="w-signature-pad" width="600" height="150" style="width: 100%; height: 140px; display: block; cursor: crosshair;"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <button type="button" onclick="wGoToStep(2)" style="height: 42px; padding: 0 20px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 10px; font-weight: 800; font-size: 12.5px; cursor: pointer;">➔ السابق</button>
+                    <button type="button" id="w_btn_next_3" disabled onclick="wGoToStep(4)" style="height: 44px; padding: 0 28px; background: #881337; color: white; border: none; border-radius: 10px; font-weight: 800; font-size: 13.5px; cursor: not-allowed; opacity: 0.5;">مراجعة ملخص الطلب ➔</button>
                 </div>
             </div>
-        <?php endif; ?>
 
-        <!-- CARD REQUESTS MANAGEMENT SECTION -->
-        <div>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                <h3 style="margin: 0; font-size: 14px; font-weight: 900; color: #0f172a;">📋 طلبات التصاريح</h3>
+            <!-- STEP 4: FINAL SUMMARY REVIEW & SUBMIT -->
+            <div id="w-panel-step-4" style="display: none;">
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px; margin-bottom: 18px;">
+                    <h4 style="margin: 0 0 12px 0; font-size: 15px; font-weight: 900; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">ملخص وتأكيد طلب تصريح الخروج</h4>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 12px; color: #334155; line-height: 1.6; margin-bottom: 14px;">
+                        <div><strong>اسم الطالب:</strong> <span id="w_sum_stu_name" style="color: #0f172a; font-weight: 800;">---</span></div>
+                        <div><strong>الصف والشعبة:</strong> <span id="w_sum_stu_class" style="color: #0f172a; font-weight: 800;">---</span></div>
+                        <div><strong>كود الطالب:</strong> <span id="w_sum_stu_code" style="color: #881337; font-weight: 800;">---</span></div>
+                        <div><strong>ولي الأمر:</strong> <span id="w_sum_parent_name" style="color: #0f172a; font-weight: 800;">---</span></div>
+                        <div><strong>هاتف التواصل:</strong> <span id="w_sum_parent_phone" style="color: #0f172a; font-weight: 800;">---</span></div>
+                        <div><strong>تاريخ الطلب:</strong> <span style="color: #0f172a; font-weight: 800;"><?php echo current_time('Y-m-d'); ?></span></div>
+                    </div>
+
+                    <div style="border-top: 1px solid #e2e8f0; padding-top: 10px;">
+                        <div style="font-size: 11.5px; font-weight: 800; color: #64748b; margin-bottom: 4px;">معاينة التوقيع الإلكتروني المعتمد:</div>
+                        <div style="background: white; border: 1px solid #cbd5e1; border-radius: 8px; padding: 6px; text-align: center;">
+                            <img id="w_sum_sig_img" src="" style="max-height: 60px; object-fit: contain;" alt="Signature Preview">
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <button type="button" onclick="wGoToStep(3)" style="height: 42px; padding: 0 20px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 10px; font-weight: 800; font-size: 12.5px; cursor: pointer;">➔ تعديل البيانات</button>
+                    <button type="button" id="w_btn_submit_final" onclick="wSubmitExitCardFinal()" style="height: 46px; padding: 0 32px; background: #16a34a; color: white; border: none; border-radius: 10px; font-weight: 900; font-size: 14px; cursor: pointer; box-shadow: 0 4px 12px rgba(22,163,74,0.25);">تأكيد وإرسال الطلب النهائي ✓</button>
+                </div>
+            </div>
+
+            <!-- SUBMISSION SUCCESS CONFIRMATION SCREEN -->
+            <div id="w-panel-success" style="display: none; text-align: center; padding: 20px 10px;">
+                <div style="width: 64px; height: 64px; background: #dcfce7; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #16a34a; margin-bottom: 14px; font-size: 28px; font-weight: 900;">✓</div>
+                <h3 style="margin: 0 0 6px 0; font-size: 20px; font-weight: 900; color: #15803d;">تم تقديم طلب تصريح الخروج بنجاح</h3>
+                <p style="font-size: 13px; color: #475569; margin: 0 0 16px 0;">تم تسجيل الطلب بالنظام وهو الآن قيد المراجعة المباشرة من قسم شؤون الطلاب.</p>
+
+                <div style="background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 14px; padding: 16px; max-width: 380px; margin: 0 auto 20px auto;">
+                    <div style="font-size: 11px; color: #64748b; font-weight: 800; margin-bottom: 2px;">الرقم المرجعي للطلب:</div>
+                    <div style="font-size: 22px; font-weight: 900; color: #881337; font-family: monospace; letter-spacing: 1px;" id="w_success_ref_no">EXT-2026-00000</div>
+                </div>
+
+                <button type="button" onclick="location.reload()" style="height: 42px; padding: 0 26px; background: #0f172a; color: white; border: none; border-radius: 10px; font-weight: 800; font-size: 13px; cursor: pointer;">الرجوع للصفحة الرئيسية</button>
+            </div>
+        </div>
+
+        <!-- VIEW 2: REQUIRED DATA FOR UPDATE (SETTINGS VIEW) -->
+        <div id="pv-view-required-data" style="display: none;">
+            <div style="border-bottom: 2px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 18px;">
+                <h3 style="margin: 0 0 4px 0; font-size: 18px; font-weight: 900; color: #0f172a;">📝 البيانات المطلوبة للتحديث</h3>
+                <div style="font-size: 12px; color: #64748b;">حدد حقول بيانات الطالب المطلوب للطلاب/أولياء الأمور استكمالها عند وجود نقص بالسجل:</div>
+            </div>
+
+            <form onsubmit="wSavePortalSettingsFromView(event)">
+                <input type="hidden" name="portal_mode" value="<?php echo esc_attr($portal_mode); ?>">
+
+                <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
+                    <?php
+                    $available_fields = array(
+                        'guardian_phone' => 'رقم هاتف ولي الأمر (+971)',
+                        'dob' => 'تاريخ الميلاد',
+                        'gender' => 'الجنس',
+                        'guardian_name' => 'اسم ولي الأمر الثلاثي',
+                        'emirate' => 'إمارة السكن',
+                        'address' => 'العنوان السكني التفصيلي',
+                        'nationality' => 'الجنسية',
+                        'national_id' => 'رقم الهوية الوطنية'
+                    );
+                    foreach ($available_fields as $fk => $flabel):
+                        $chk = in_array($fk, $required_fields) ? 'checked' : '';
+                    ?>
+                        <label style="display: flex; align-items: center; gap: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; cursor: pointer; font-size: 13px; font-weight: 800; color: #0f172a; transition: border-color 0.2s;">
+                            <input type="checkbox" name="required_fields[]" value="<?php echo esc_attr($fk); ?>" <?php echo $chk; ?> style="width: 18px; height: 18px;">
+                            <span><?php echo esc_html($flabel); ?></span>
+                        </label>
+                    <?php endforeach; ?>
+                </div>
+
                 <?php if ($is_admin): ?>
-                    <button type="button" onclick="wLoadCardRequests()" style="background: #f1f5f9; border: 1px solid #cbd5e1; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 800; cursor: pointer;">تحديث ↺</button>
+                    <button type="submit" style="height: 44px; padding: 0 28px; background: #0f172a; color: white; border: none; border-radius: 10px; font-weight: 800; font-size: 13px; cursor: pointer;">حفظ الحقول المطلوبة ✓</button>
+                <?php else: ?>
+                    <div style="font-size: 12px; color: #991b1b; background: #fef2f2; padding: 10px; border-radius: 8px;">تنبيه: تعديل الإعدادات متاح فقط لمشرفي النظام.</div>
                 <?php endif; ?>
+            </form>
+        </div>
+
+        <!-- VIEW 3: PORTAL OPERATING MODE (SETTINGS VIEW) -->
+        <div id="pv-view-operating-mode" style="display: none;">
+            <div style="border-bottom: 2px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 18px;">
+                <h3 style="margin: 0 0 4px 0; font-size: 18px; font-weight: 900; color: #0f172a;">⚙️ نمط عمل البوابة (Portal Mode)</h3>
+                <div style="font-size: 12px; color: #64748b;">اختر طريقة وطبيعة تقديم الخدمة للمستخدمين عبر هذا الرابط:</div>
             </div>
 
-            <!-- Visual Request Cards List -->
-            <div id="sb-card-requests-list" style="display: flex; flex-direction: column; gap: 10px; max-height: 480px; overflow-y: auto;">
-                <div style="text-align: center; font-size: 11.5px; color: #64748b; padding: 12px;">جاري تحميل الطلبات...</div>
+            <form onsubmit="wSavePortalSettingsFromView(event)">
+                <!-- Preserve existing required fields -->
+                <?php foreach ($required_fields as $rf): ?>
+                    <input type="hidden" name="required_fields[]" value="<?php echo esc_attr($rf); ?>">
+                <?php endforeach; ?>
+
+                <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">
+                    <label style="display: flex; align-items: flex-start; gap: 12px; background: #f8fafc; border: 2px solid <?php echo ($portal_mode === 'card_application') ? '#881337' : '#e2e8f0'; ?>; border-radius: 14px; padding: 16px; cursor: pointer;">
+                        <input type="radio" name="portal_mode" value="card_application" <?php checked($portal_mode, 'card_application'); ?> style="width: 20px; height: 20px; margin-top: 2px;">
+                        <div>
+                            <div style="font-size: 14px; font-weight: 900; color: #0f172a; margin-bottom: 2px;">تقديم بطاقات تصريح الخروج + استكمال البيانات</div>
+                            <div style="font-size: 12px; color: #64748b; line-height: 1.5;">يتيح للطلاب وأولياء الأمور تقديم طلب تصريح خروج رسمي مع اشتراط استكمال أي بيانات مفقودة تلقائياً خلال الطلب.</div>
+                        </div>
+                    </label>
+
+                    <label style="display: flex; align-items: flex-start; gap: 12px; background: #f8fafc; border: 2px solid <?php echo ($portal_mode === 'update_only') ? '#881337' : '#e2e8f0'; ?>; border-radius: 14px; padding: 16px; cursor: pointer;">
+                        <input type="radio" name="portal_mode" value="update_only" <?php checked($portal_mode, 'update_only'); ?> style="width: 20px; height: 20px; margin-top: 2px;">
+                        <div>
+                            <div style="font-size: 14px; font-weight: 900; color: #0f172a; margin-bottom: 2px;">تحديث بيانات الطالب فقط (Data Update Only)</div>
+                            <div style="font-size: 12px; color: #64748b; line-height: 1.5;">يقتصر عمل البوابة على التحقق واستكمال البيانات المطلوبة المحددة فقط دون فتح خيار تقديم بطاقة خروج.</div>
+                        </div>
+                    </label>
+                </div>
+
+                <?php if ($is_admin): ?>
+                    <button type="submit" style="height: 44px; padding: 0 28px; background: #0f172a; color: white; border: none; border-radius: 10px; font-weight: 800; font-size: 13px; cursor: pointer;">حفظ نمط العمل ✓</button>
+                <?php else: ?>
+                    <div style="font-size: 12px; color: #991b1b; background: #fef2f2; padding: 10px; border-radius: 8px;">تنبيه: تعديل الإعدادات متاح فقط لمشرفي النظام.</div>
+                <?php endif; ?>
+            </form>
+        </div>
+
+        <!-- VIEW 4: EXIT CARD REQUESTS MANAGEMENT (MANAGEMENT VIEW) -->
+        <div id="pv-view-requests-management" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f1f5f9; padding-bottom: 12px; margin-bottom: 18px;">
+                <div>
+                    <h3 style="margin: 0 0 4px 0; font-size: 18px; font-weight: 900; color: #0f172a;">📋 إدارة طلبات تصاريح الخروج</h3>
+                    <div style="font-size: 12px; color: #64748b;">متابعة، مراجعة، والتحقق من طلبات تصاريح الخروج المقدمة عبر البوابة:</div>
+                </div>
+                <button type="button" onclick="wLoadCardRequestsFull()" style="background: #f1f5f9; border: 1px solid #cbd5e1; padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 800; cursor: pointer;">تحديث القائمة ↺</button>
             </div>
+
+            <!-- List of Visual Cards for Requests -->
+            <div id="pv-requests-cards-container" style="display: grid; grid-template-columns: 1fr; gap: 14px;">
+                <div style="text-align: center; color: #64748b; padding: 20px; font-size: 13px;">جاري تحميل طلبات تصاريح الخروج...</div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- RIGHT NAVIGATION SIDEBAR (Navigation Items ONLY) -->
+    <div id="eess-portal-nav-sidebar" style="flex: 0 0 280px; width: 280px; max-width: 100%; order: 2; background: #ffffff; border-radius: 20px; border: 1px solid #e2e8f0; box-shadow: 0 10px 30px rgba(15,23,42,0.08); padding: 18px; box-sizing: border-box;">
+
+        <div style="font-size: 14px; font-weight: 900; color: #0f172a; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; gap: 8px;">
+            <span>🧭 القائمة العامة للبوابة</span>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px;" id="sb-nav-items-list">
+            <button type="button" class="sb-nav-btn active" onclick="wSwitchPortalView('pv-view-wizard', this)" style="width: 100%; text-align: right; background: #881337; color: white; border: none; padding: 12px 14px; border-radius: 12px; font-weight: 800; font-size: 13px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 8px;">
+                <span>🎓</span> <span>تقديم طلب / تحديث بيانات</span>
+            </button>
+
+            <button type="button" class="sb-nav-btn" onclick="wSwitchPortalView('pv-view-required-data', this)" style="width: 100%; text-align: right; background: #f8fafc; color: #334155; border: 1px solid #e2e8f0; padding: 12px 14px; border-radius: 12px; font-weight: 800; font-size: 13px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 8px;">
+                <span>📝</span> <span>البيانات المطلوبة للتحديث</span>
+            </button>
+
+            <button type="button" class="sb-nav-btn" onclick="wSwitchPortalView('pv-view-operating-mode', this)" style="width: 100%; text-align: right; background: #f8fafc; color: #334155; border: 1px solid #e2e8f0; padding: 12px 14px; border-radius: 12px; font-weight: 800; font-size: 13px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 8px;">
+                <span>⚙️</span> <span>نمط عمل البوابة</span>
+            </button>
+
+            <button type="button" class="sb-nav-btn" onclick="wSwitchPortalView('pv-view-requests-management', this)" style="width: 100%; text-align: right; background: #f8fafc; color: #334155; border: 1px solid #e2e8f0; padding: 12px 14px; border-radius: 12px; font-weight: 800; font-size: 13px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 8px;">
+                <span>📋</span> <span>طلبات تصاريح الخروج</span>
+            </button>
+        </div>
+
+        <div style="margin-top: 20px; padding-top: 14px; border-top: 1px solid #f1f5f9; font-size: 11px; color: #64748b; line-height: 1.5; text-align: center;">
+            النمط الحالي: <strong style="color:#0f172a;"><?php echo ($portal_mode === 'update_only') ? 'تحديث فقط' : 'تصاريح الخروج'; ?></strong>
         </div>
 
     </div>
 
 </div>
 
-<!-- VIEW REQUEST MODAL -->
+<!-- VIEW REQUEST DETAILS MODAL -->
 <div id="w-req-view-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.6); z-index: 99999; align-items: center; justify-content: center; padding: 15px; box-sizing: border-box;">
-    <div style="background: white; border-radius: 16px; max-width: 500px; width: 100%; padding: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); direction: rtl; font-family: 'Cairo', sans-serif;">
+    <div style="background: white; border-radius: 18px; max-width: 520px; width: 100%; padding: 22px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); direction: rtl; font-family: 'Cairo', sans-serif;">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 14px;">
-            <h4 style="margin: 0; font-size: 15px; font-weight: 900; color: #0f172a;" id="modal_req_title">تفاصيل طلب تصريح الخروج</h4>
-            <button type="button" onclick="document.getElementById('w-req-view-modal').style.display='none'" style="background: none; border: none; font-size: 20px; cursor: pointer; color: #64748b;">✕</button>
+            <h4 style="margin: 0; font-size: 16px; font-weight: 900; color: #0f172a;" id="modal_req_title">تفاصيل طلب تصريح الخروج</h4>
+            <button type="button" onclick="document.getElementById('w-req-view-modal').style.display='none'" style="background: none; border: none; font-size: 22px; cursor: pointer; color: #64748b;">✕</button>
         </div>
-        <div id="modal_req_body" style="font-size: 12px; color: #334155; line-height: 1.6;"></div>
+        <div id="modal_req_body" style="font-size: 12.5px; color: #334155; line-height: 1.7;"></div>
     </div>
 </div>
-
-<!-- HIDDEN PRINT CONTAINER -->
-<div id="eess-card-print-frame" style="display: none;"></div>
 
 <script>
 let wCurrentStep = 1;
@@ -335,7 +384,7 @@ let wVerifiedData = null;
 let wSearchTimeout = null;
 let wSubmitting = false;
 
-// Signature pad
+// Signature Canvas
 let wCanvas = null;
 let wCtx = null;
 let wIsDrawing = false;
@@ -367,9 +416,30 @@ document.addEventListener('DOMContentLoaded', function() {
         wCanvas.addEventListener('touchmove', function(e) { e.preventDefault(); if (!wIsDrawing) return; const p = getPos(e); wCtx.lineTo(p.x, p.y); wCtx.stroke(); wCheckStep3Valid(); });
         wCanvas.addEventListener('touchend', function() { wIsDrawing = false; });
     }
-
-    wLoadCardRequests();
 });
+
+function wSwitchPortalView(viewId, btnEl) {
+    document.querySelectorAll('#pv-view-wizard, #pv-view-required-data, #pv-view-operating-mode, #pv-view-requests-management').forEach(el => {
+        el.style.display = 'none';
+    });
+    const target = document.getElementById(viewId);
+    if (target) target.style.display = 'block';
+
+    document.querySelectorAll('.sb-nav-btn').forEach(btn => {
+        btn.style.background = '#f8fafc';
+        btn.style.color = '#334155';
+        btn.style.border = '1px solid #e2e8f0';
+    });
+    if (btnEl) {
+        btnEl.style.background = '#881337';
+        btnEl.style.color = 'white';
+        btnEl.style.border = 'none';
+    }
+
+    if (viewId === 'pv-view-requests-management') {
+        wLoadCardRequestsFull();
+    }
+}
 
 function wClearSignature() {
     if (wCtx && wCanvas) {
@@ -475,7 +545,6 @@ function wVerifyStudentIdentity() {
             let html = '<div style="background:#ffffff; border:1px solid #cbd5e1; border-radius:14px; padding:16px;">';
             html += '<div style="font-size:13px; font-weight:800; color:#16a34a; margin-bottom:6px;">✓ تم التحقق بنجاح من هويّة الطالب</div>';
 
-            // Check dynamic missing fields
             if (res.data.missing_fields && res.data.missing_fields.length > 0) {
                 wRenderMissingFieldsForm(res.data.missing_fields, res.data.student);
                 missingBox.style.display = 'block';
@@ -603,10 +672,8 @@ function wSubmitMissingData(e) {
             btn.innerText = 'حفظ وتحديث البيانات الحالية ✓';
 
             if (res.success) {
-                alert(res.data.message || 'تم حغظ البيانات بنجاح.');
+                alert(res.data.message || 'تم حفظ البيانات بنجاح.');
                 document.getElementById('w-missing-data-container').style.display = 'none';
-
-                // Re-trigger verify to update UI cleanly
                 wVerifyStudentIdentity();
             } else {
                 alert('خطأ: ' + (res.data || 'فشل حفظ البيانات.'));
@@ -736,7 +803,6 @@ function wSubmitExitCardFinal() {
                 document.getElementById('w-progress-bar').style.display = 'none';
                 document.getElementById('w_success_ref_no').innerText = res.data.reference_no;
                 document.getElementById('w-panel-success').style.display = 'block';
-                wLoadCardRequests();
             } else {
                 btn.disabled = false;
                 btn.innerHTML = 'تأكيد وإرسال الطلب النهائي ✓';
@@ -752,9 +818,9 @@ function wSubmitExitCardFinal() {
     });
 }
 
-function wSavePortalSettings(e) {
+function wSavePortalSettingsFromView(e) {
     e.preventDefault();
-    const form = document.getElementById('eess_card_settings_form');
+    const form = e.target;
     const formData = new FormData(form);
     formData.append('action', 'sm_save_exit_card_settings');
     formData.append('nonce', '<?php echo $admin_nonce; ?>');
@@ -776,8 +842,8 @@ function wSavePortalSettings(e) {
     });
 }
 
-function wLoadCardRequests() {
-    const box = document.getElementById('sb-card-requests-list');
+function wLoadCardRequestsFull() {
+    const box = document.getElementById('pv-requests-cards-container');
     if (!box) return;
 
     jQuery.post('<?php echo $ajax_url; ?>', {
@@ -793,27 +859,100 @@ function wLoadCardRequests() {
                 if (r.status === 'approved') { badgeBg = '#dcfce7'; badgeColor = '#166534'; }
                 else if (r.status === 'rejected') { badgeBg = '#fee2e2'; badgeColor = '#991b1b'; }
 
-                html += '<div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:12px; box-shadow:0 2px 6px rgba(0,0,0,0.02);">';
-                html += '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">';
-                html += '<div style="font-size:12.5px; font-weight:900; color:#0f172a;">' + r.student_name + '</div>';
-                html += '<span style="background:' + badgeBg + '; color:' + badgeColor + '; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:800;">' + r.status_label + '</span>';
+                let vbadgeBg = '#fef3c7';
+                let vbadgeColor = '#92400e';
+                if (r.verification_status === 'parent_confirmed') { vbadgeBg = '#d1fae5'; vbadgeColor = '#065f46'; }
+                else if (r.verification_status === 'parent_not_confirmed') { vbadgeBg = '#fee2e2'; vbadgeColor = '#991b1b'; }
+
+                // Build exact formal Arabic WhatsApp message
+                let waText = "السيد/السيدة ولي أمر الطالب/ة المحترم/ة،\n\n";
+                waText += "نحيطكم علمًا بأنه تم تقديم طلب إصدار بطاقة تصريح خروج للطالب/ة " + r.student_name + "، كود الطالب " + r.student_code + ".\n\n";
+                waText += "ونظرًا لأن إصدار بطاقة تصريح الخروج يتطلب التأكد من موافقة ولي الأمر، نرجو منكم التكرم بتأكيد ما إذا كان هذا الطلب قد تم تقديمه من قبلكم أو بموافقتكم، وأنكم توافقون على إصدار بطاقة تصريح خروج للطالب/ة والسماح له/لها بالخروج في نهاية الدوام المدرسي وفقًا للأنظمة والإجراءات المعتمدة لدى المدرسة.\n\n";
+                waText += "في حال موافقتكم، يرجى الرد على هذه الرسالة بالنص التالي:\n\n";
+                waText += '\"أؤكد أنني ولي أمر الطالب/ة المذكور/ة أعلاه، وأوافق على إصدار بطاقة تصريح الخروج والسماح له/لها بالخروج في نهاية الدوام المدرسي.\"\n\n';
+                waText += "وفي حال عدم تقديمكم للطلب أو عدم موافقتكم عليه، يرجى توضيح ذلك في الرد.\n\n";
+                waText += "شاكرين لكم تعاونكم وتأكيدكم.\n\n";
+                waText += "مع خالص التقدير والاحترام.";
+
+                let waUrl = 'https://api.whatsapp.com/send?phone=' + encodeURIComponent(r.wa_phone) + '&text=' + encodeURIComponent(waText);
+
+                html += '<div style="background:#f8fafc; border:1.5px solid #e2e8f0; border-radius:16px; padding:18px; box-shadow:0 4px 12px rgba(0,0,0,0.03); display:flex; flex-direction:column; gap:10px;">';
+                html += '<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">';
+                html += '<div>';
+                html += '<span style="font-size:15px; font-weight:900; color:#0f172a;">' + r.student_name + '</span> ';
+                html += '<span style="font-size:12px; color:#881337; font-weight:800;">(' + r.student_code + ')</span>';
+                html += '</div>';
+                html += '<div style="display:flex; gap:6px;">';
+                html += '<span style="background:' + badgeBg + '; color:' + badgeColor + '; padding:3px 10px; border-radius:8px; font-size:11px; font-weight:800;">' + r.status_label + '</span>';
+                html += '<span style="background:' + vbadgeBg + '; color:' + vbadgeColor + '; padding:3px 10px; border-radius:8px; font-size:11px; font-weight:800;">' + r.verification_label + '</span>';
+                html += '</div></div>';
+
+                html += '<div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; font-size:12px; color:#475569; line-height:1.6;">';
+                html += '<div><strong>الصف والشعبة:</strong> ' + r.class_name + ' (' + r.section + ')</div>';
+                html += '<div><strong>الرقم المرجعي:</strong> <span style="font-family:monospace; font-weight:800; color:#0f172a;">' + r.reference_no + '</span></div>';
+                html += '<div><strong>ولي الأمر:</strong> ' + r.parent_name + '</div>';
+                html += '<div><strong>هاتف التواصل:</strong> <span style="direction:ltr; display:inline-block;">' + r.parent_phone + '</span></div>';
+                html += '<div><strong>تاريخ الطلب:</strong> ' + r.created_at + '</div>';
                 html += '</div>';
 
-                html += '<div style="font-size:11px; color:#64748b; line-height:1.5; margin-bottom:8px;">';
-                html += '<strong>الصف:</strong> ' + r.class_name + ' (' + r.section + ') | <strong>كود:</strong> ' + r.student_code + '<br>';
-                html += '<strong>مرجع:</strong> <span style="color:#881337; font-weight:800;">' + r.reference_no + '</span>';
-                html += '</div>';
+                html += '<div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; border-top:1px solid #e2e8f0; padding-top:12px; margin-top:2px;">';
+                html += '<button type="button" onclick="wViewCardRequestDetails(' + r.id + ')" style="background:#0f172a; color:white; border:none; padding:6px 12px; border-radius:8px; font-size:11.5px; font-weight:800; cursor:pointer;">👁️ عرض/مراجعة</button>';
 
-                html += '<div style="display:flex; gap:6px; flex-wrap:wrap; font-size:10.5px;">';
-                html += '<button type="button" onclick="wViewCardRequestDetails(' + r.id + ')" style="background:#0f172a; color:white; border:none; padding:4px 8px; border-radius:6px; font-weight:800; cursor:pointer;">عرض الطلب</button>';
-                html += '<button type="button" onclick="wPrintStudentCard(' + r.student_id + ')" style="background:#881337; color:white; border:none; padding:4px 8px; border-radius:6px; font-weight:800; cursor:pointer;">طباعة البطاقة</button>';
+                if (r.wa_phone) {
+                    html += '<a href="' + waUrl + '" target="_blank" style="background:#25D366; color:white; text-decoration:none; padding:6px 12px; border-radius:8px; font-size:11.5px; font-weight:800; display:inline-flex; align-items:center; gap:4px;">💬 تحقق عبر واتساب</a>';
+                }
+
+                html += '<select onchange="wChangeVerificationStatus(' + r.id + ', this.value)" style="height:32px; border-radius:8px; border:1px solid #cbd5e1; font-size:11px; font-weight:700; padding:0 6px;">';
+                html += '<option value="pending_verification" ' + (r.verification_status==='pending_verification'?'selected':'') + '>قيد التحقق</option>';
+                html += '<option value="parent_confirmed" ' + (r.verification_status==='parent_confirmed'?'selected':'') + '>تم التأكيد من ولي الأمر</option>';
+                html += '<option value="parent_not_confirmed" ' + (r.verification_status==='parent_not_confirmed'?'selected':'') + '>لم يتم التأكيد</option>';
+                html += '</select>';
+
+                html += '<button type="button" onclick="wPrintStudentCard(' + r.student_id + ')" style="background:#881337; color:white; border:none; padding:6px 12px; border-radius:8px; font-size:11.5px; font-weight:800; cursor:pointer;">🪪 طباعة البطاقة</button>';
+                html += '<button type="button" onclick="wDeleteCardRequest(' + r.id + ', \'' + r.student_name.replace(/'/g, "\\'") + '\')" style="background:#fee2e2; color:#991b1b; border:1px solid #fecdd3; padding:6px 12px; border-radius:8px; font-size:11.5px; font-weight:800; cursor:pointer;">🗑️ حذف الطلب</button>';
                 html += '</div>';
 
                 html += '</div>';
             });
             box.innerHTML = html;
         } else {
-            box.innerHTML = '<div style="text-align:center; font-size:11.5px; color:#64748b; padding:12px;">لا توجد طلبات مسجلة حتى الآن.</div>';
+            box.innerHTML = '<div style="text-align:center; color:#64748b; padding:20px; font-size:12.5px;">لا توجد طلبات تصاريح خروج مسجلة حتى الآن.</div>';
+        }
+    });
+}
+
+function wChangeVerificationStatus(reqId, vstatus) {
+    jQuery.post('<?php echo $ajax_url; ?>', {
+        action: 'sm_manage_card_requests',
+        action_type: 'update_verification_status',
+        request_id: reqId,
+        verification_status: vstatus,
+        nonce: '<?php echo $admin_nonce; ?>'
+    }, function(res) {
+        if (res.success) {
+            wLoadCardRequestsFull();
+        } else {
+            alert('فشل تحديث حالة التحقق: ' + (res.data || 'خطأ'));
+        }
+    });
+}
+
+function wDeleteCardRequest(reqId, studentName) {
+    if (!confirm('هل أنت أكر من حذف هذا الطلب للطالب (' + studentName + ')؟\n\nتنبيه: سيتم حذف الطلب فقط ولن يتم حذف سجل الطالب نفسه من النظام.')) {
+        return;
+    }
+
+    jQuery.post('<?php echo $ajax_url; ?>', {
+        action: 'sm_manage_card_requests',
+        action_type: 'delete',
+        request_id: reqId,
+        nonce: '<?php echo $admin_nonce; ?>'
+    }, function(res) {
+        if (res.success) {
+            alert(res.data.message || 'تم حذف الطلب بنجاح.');
+            wLoadCardRequestsFull();
+        } else {
+            alert('فشل حذف الطلب: ' + (res.data || 'خطأ'));
         }
     });
 }
@@ -866,7 +1005,7 @@ function wUpdateReqStatus(reqId, status) {
         if (res.success) {
             alert('تم تحديث حالة الطلب بنجاح.');
             document.getElementById('w-req-view-modal').style.display = 'none';
-            wLoadCardRequests();
+            wLoadCardRequestsFull();
         }
     });
 }

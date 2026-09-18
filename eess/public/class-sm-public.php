@@ -14404,6 +14404,26 @@ class SM_Public {
         wp_send_json_success(array('message' => 'تم حفظ إعدادات البوابة وضوابط التحديث بنجاح.'));
     }
 
+    public static function eess_get_verification_status_label($vstatus) {
+        $labels = array(
+            'pending_verification' => 'قيد التحقق من ولي الأمر',
+            'parent_confirmed'     => 'تم تأكيد ولي الأمر',
+            'parent_not_confirmed' => 'لم يتم التأكيد'
+        );
+        return $labels[$vstatus] ?? 'قيد التحقق من ولي الأمر';
+    }
+
+    public static function normalize_uae_whatsapp_phone($phone) {
+        if (empty($phone)) return '';
+        $digits = preg_replace('/\D/', '', $phone);
+        if (strpos($digits, '05') === 0) {
+            $digits = '971' . substr($digits, 1);
+        } elseif (strpos($digits, '5') === 0 && strlen($digits) === 9) {
+            $digits = '971' . $digits;
+        }
+        return $digits;
+    }
+
     public function ajax_manage_card_requests() {
         if (!wp_verify_nonce($_REQUEST['nonce'] ?? '', 'sm_admin_action') && !wp_verify_nonce($_REQUEST['nonce'] ?? '', 'eess_admin_action')) {
             wp_send_json_error('Security check failed');
@@ -14412,12 +14432,14 @@ class SM_Public {
             wp_send_json_error('عفواً، لا تمتلك الصلاحية الكافية.');
         }
 
+        SM_DB::ensure_exit_card_requests_columns_exist();
+
         global $wpdb;
         $action_type = sanitize_text_field($_REQUEST['action_type'] ?? 'list');
 
         if ($action_type === 'list') {
             $requests = $wpdb->get_results(
-                "SELECT r.*, s.name as student_name, s.student_code, s.class_name, s.section, s.photo_url
+                "SELECT r.*, s.name as student_name, s.student_code, s.class_name, s.section, s.photo_url, s.guardian_phone as stu_guardian_phone
                  FROM {$wpdb->prefix}sm_exit_card_requests r
                  LEFT JOIN {$wpdb->prefix}sm_students s ON r.student_id = s.id
                  ORDER BY r.id DESC LIMIT 50"
@@ -14425,6 +14447,10 @@ class SM_Public {
 
             $formatted = array();
             foreach ($requests as $r) {
+                $raw_phone = !empty($r->stu_guardian_phone) ? $r->stu_guardian_phone : $r->parent_phone;
+                $wa_phone  = self::normalize_uae_whatsapp_phone($raw_phone);
+                $vstatus   = !empty($r->verification_status) ? $r->verification_status : 'pending_verification';
+
                 $formatted[] = array(
                     'id' => $r->id,
                     'reference_no' => $r->reference_no ?: ('EXT-' . date('Y') . '-' . $r->id),
@@ -14434,10 +14460,13 @@ class SM_Public {
                     'class_name' => $r->class_name ?: 'غير محدد',
                     'section' => $r->section ?: '-',
                     'photo_url' => $r->photo_url ?: '',
-                    'parent_name' => $r->parent_name,
-                    'parent_phone' => $r->parent_phone,
+                    'parent_name' => $r->parent_name ?: '',
+                    'parent_phone' => $raw_phone ?: '',
+                    'wa_phone' => $wa_phone,
                     'status' => $r->status,
                     'status_label' => self::eess_get_exit_card_status_label($r->status),
+                    'verification_status' => $vstatus,
+                    'verification_label' => self::eess_get_verification_status_label($vstatus),
                     'created_at' => date_i18n('Y-m-d H:i', strtotime($r->created_at))
                 );
             }
@@ -14453,12 +14482,31 @@ class SM_Public {
             $wpdb->update("{$wpdb->prefix}sm_exit_card_requests", array('status' => $new_status), array('id' => $req_id));
             wp_send_json_success(array('message' => 'تم تحديث حالة الطلب بنجاح.'));
 
+        } elseif ($action_type === 'update_verification_status') {
+            $req_id = intval($_POST['request_id'] ?? 0);
+            $vstatus = sanitize_text_field($_POST['verification_status'] ?? 'pending_verification');
+            if (!$req_id) {
+                wp_send_json_error('معرف الطلب غير صحيح.');
+            }
+
+            $wpdb->update("{$wpdb->prefix}sm_exit_card_requests", array(
+                'verification_status' => $vstatus,
+                'verified_at' => current_time('mysql')
+            ), array('id' => $req_id));
+
+            wp_send_json_success(array(
+                'message' => 'تم تحديث حالة تحقق ولي الأمر بنجاح.',
+                'verification_status' => $vstatus,
+                'verification_label' => self::eess_get_verification_status_label($vstatus)
+            ));
+
         } elseif ($action_type === 'delete') {
             $req_id = intval($_POST['request_id'] ?? 0);
             if (!$req_id) wp_send_json_error('معرف الطلب غير صحيح.');
 
+            // Delete ONLY the request record from sm_exit_card_requests (preserving student record)
             $wpdb->delete("{$wpdb->prefix}sm_exit_card_requests", array('id' => $req_id));
-            wp_send_json_success(array('message' => 'تم حذف الطلب بنجاح.'));
+            wp_send_json_success(array('message' => 'تم حذف طلب تصريح الخروج بنجاح مع الحفاظ على سجل الطالب.'));
         }
 
         wp_send_json_error('إجراء غير معروف.');
