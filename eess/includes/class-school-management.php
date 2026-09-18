@@ -169,8 +169,11 @@ class School_Management {
 
         // System Administrator Student Control Endpoints
         $this->loader->add_action('wp_ajax_eess_admin_delete_institution_students', $plugin_public, 'ajax_eess_admin_delete_institution_students');
+        $this->loader->add_action('wp_ajax_eess_admin_delete_all_students_global', $plugin_public, 'ajax_eess_admin_delete_all_students_global');
         $this->loader->add_action('wp_ajax_eess_admin_reset_student_sequence', $plugin_public, 'ajax_eess_admin_reset_student_sequence');
+        $this->loader->add_action('wp_ajax_eess_admin_reset_all_student_sequences_global', $plugin_public, 'ajax_eess_admin_reset_all_student_sequences_global');
         $this->loader->add_action('wp_ajax_eess_admin_update_academic_year', $plugin_public, 'ajax_eess_admin_update_academic_year');
+        $this->loader->add_action('wp_ajax_eess_export_students_pdf', $plugin_public, 'ajax_export_students_pdf');
 
         // Admin approval actions
         $this->loader->add_action('wp_ajax_eess_approve_user', $plugin_public, 'ajax_approve_user');

@@ -634,39 +634,169 @@ class SM_DB {
 
     public static function get_backup_data() {
         global $wpdb;
+
+        $options = $wpdb->get_results(
+            "SELECT option_name, option_value FROM {$wpdb->options} WHERE option_name LIKE 'sm\_%' OR option_name LIKE 'eess\_%'",
+            ARRAY_A
+        );
+
         $data = array(
+            'version' => '2.5.0',
+            'exported_at' => current_time('mysql'),
+            'institutions' => $wpdb->get_results("SELECT * FROM {$wpdb->prefix}eess_institutions", ARRAY_A),
+            'schools' => $wpdb->get_results("SELECT * FROM {$wpdb->prefix}eess_schools", ARRAY_A),
+            'departments' => $wpdb->get_results("SELECT * FROM {$wpdb->prefix}eess_departments", ARRAY_A),
+            'users' => $wpdb->get_results("SELECT * FROM {$wpdb->prefix}sm_users", ARRAY_A),
             'students' => $wpdb->get_results("SELECT * FROM {$wpdb->prefix}sm_students", ARRAY_A),
             'records' => $wpdb->get_results("SELECT r.*, s.student_code FROM {$wpdb->prefix}sm_records r JOIN {$wpdb->prefix}sm_students s ON r.student_id = s.id", ARRAY_A),
-            'attendance' => $wpdb->get_results("SELECT a.*, s.student_code FROM {$wpdb->prefix}sm_attendance a JOIN {$wpdb->prefix}sm_students s ON a.student_id = s.id", ARRAY_A)
+            'attendance' => $wpdb->get_results("SELECT a.*, s.student_code FROM {$wpdb->prefix}sm_attendance a JOIN {$wpdb->prefix}sm_students s ON a.student_id = s.id", ARRAY_A),
+            'exit_card_requests' => $wpdb->get_results("SELECT r.*, s.student_code FROM {$wpdb->prefix}sm_exit_card_requests r JOIN {$wpdb->prefix}sm_students s ON r.student_id = s.id", ARRAY_A),
+            'settings' => $options
         );
-        return json_encode($data);
+
+        return json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
     }
 
     public static function restore_backup($json) {
         global $wpdb;
         $data = json_decode($json, true);
-        if (!$data) return false;
+        if (!$data || !is_array($data)) return false;
 
-        // Cache for student code -> local ID
-        $student_map = array();
+        self::ensure_student_columns_exist();
+        self::ensure_exit_card_requests_columns_exist();
 
-        // 1. Process Students First
-        if (isset($data['students'])) {
-            foreach ($data['students'] as $student) {
-                $exists = $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}sm_students WHERE student_code = %s", $student['student_code']));
+        // 1. Restore Institutions
+        if (!empty($data['institutions'])) {
+            foreach ($data['institutions'] as $inst) {
+                $code = $inst['code'] ?? '';
+                $name = $inst['name'] ?? '';
+                unset($inst['id']);
+
+                $exists = null;
+                if (!empty($code)) {
+                    $exists = $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}eess_institutions WHERE code = %s OR code = %d", $code, $code));
+                }
+                if (!$exists && !empty($name)) {
+                    $exists = $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}eess_institutions WHERE name = %s", $name));
+                }
+
                 if ($exists) {
-                    unset($student['id']);
-                    $wpdb->update("{$wpdb->prefix}sm_students", $student, array('id' => $exists));
-                    $student_map[$student['student_code']] = $exists;
+                    $wpdb->update("{$wpdb->prefix}eess_institutions", $inst, array('id' => $exists));
                 } else {
-                    unset($student['id']);
-                    $wpdb->insert("{$wpdb->prefix}sm_students", $student);
-                    $student_map[$student['student_code']] = $wpdb->insert_id;
+                    $wpdb->insert("{$wpdb->prefix}eess_institutions", $inst);
                 }
             }
         }
 
-        // Helper to get student ID by code (local)
+        // 2. Restore Schools
+        if (!empty($data['schools'])) {
+            foreach ($data['schools'] as $school) {
+                $code = $school['school_code'] ?? '';
+                $name = $school['name'] ?? '';
+                unset($school['id']);
+
+                $exists = null;
+                if (!empty($code)) {
+                    $exists = $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}eess_schools WHERE school_code = %s", $code));
+                }
+                if (!$exists && !empty($name)) {
+                    $exists = $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}eess_schools WHERE name = %s", $name));
+                }
+
+                if ($exists) {
+                    $wpdb->update("{$wpdb->prefix}eess_schools", $school, array('id' => $exists));
+                } else {
+                    $wpdb->insert("{$wpdb->prefix}eess_schools", $school);
+                }
+            }
+        }
+
+        // 3. Restore Departments
+        if (!empty($data['departments'])) {
+            foreach ($data['departments'] as $dept) {
+                $code = $dept['code'] ?? '';
+                $name = $dept['name'] ?? '';
+                unset($dept['id']);
+
+                $exists = null;
+                if (!empty($code)) {
+                    $exists = $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}eess_departments WHERE code = %s", $code));
+                }
+                if (!$exists && !empty($name)) {
+                    $exists = $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}eess_departments WHERE name = %s", $name));
+                }
+
+                if ($exists) {
+                    $wpdb->update("{$wpdb->prefix}eess_departments", $dept, array('id' => $exists));
+                } else {
+                    $wpdb->insert("{$wpdb->prefix}eess_departments", $dept);
+                }
+            }
+        }
+
+        // 4. Restore Staff Users
+        if (!empty($data['users'])) {
+            foreach ($data['users'] as $u) {
+                $cid = $u['civil_id'] ?? '';
+                $emp_code = $u['employee_code'] ?? '';
+                $email = $u['email'] ?? '';
+                unset($u['id']);
+
+                $exists = null;
+                if (!empty($emp_code)) {
+                    $exists = $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}sm_users WHERE employee_code = %s", $emp_code));
+                }
+                if (!$exists && !empty($cid)) {
+                    $exists = $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}sm_users WHERE civil_id = %s", $cid));
+                }
+                if (!$exists && !empty($email)) {
+                    $exists = $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}sm_users WHERE email = %s", $email));
+                }
+
+                if ($exists) {
+                    $wpdb->update("{$wpdb->prefix}sm_users", $u, array('id' => $exists));
+                } else {
+                    $wpdb->insert("{$wpdb->prefix}sm_users", $u);
+                }
+            }
+        }
+
+        // 5. Restore Students
+        $student_map = array();
+        if (!empty($data['students'])) {
+            foreach ($data['students'] as $student) {
+                $code = $student['student_code'] ?? '';
+                $nat_id = $student['national_id'] ?? '';
+                $sname = $student['name'] ?? '';
+                $sgrade = $student['class_name'] ?? '';
+                $ssec = $student['section'] ?? '';
+                unset($student['id']);
+
+                $exists = null;
+                if (!empty($code)) {
+                    $exists = $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}sm_students WHERE student_code = %s", $code));
+                }
+                if (!$exists && !empty($nat_id)) {
+                    $exists = $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}sm_students WHERE national_id = %s", $nat_id));
+                }
+                if (!$exists && !empty($sname) && !empty($sgrade) && !empty($ssec)) {
+                    $exists = $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}sm_students WHERE name = %s AND class_name = %s AND section = %s", $sname, $sgrade, $ssec));
+                }
+
+                if ($exists) {
+                    $wpdb->update("{$wpdb->prefix}sm_students", $student, array('id' => $exists));
+                    $local_id = $exists;
+                } else {
+                    $wpdb->insert("{$wpdb->prefix}sm_students", $student);
+                    $local_id = $wpdb->insert_id;
+                }
+
+                if (!empty($code)) {
+                    $student_map[$code] = $local_id;
+                }
+            }
+        }
+
         $get_sid = function($code) use (&$student_map, $wpdb) {
             if (isset($student_map[$code])) return $student_map[$code];
             $id = $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}sm_students WHERE student_code = %s", $code));
@@ -674,17 +804,15 @@ class SM_DB {
             return $id;
         };
 
-        // 2. Process Records
-        if (isset($data['records'])) {
+        // 6. Restore Behavior Records
+        if (!empty($data['records'])) {
             foreach ($data['records'] as $record) {
                 $local_sid = $get_sid($record['student_code'] ?? '');
                 if (!$local_sid) continue;
 
-                $old_id = $record['id'];
                 unset($record['id'], $record['student_code']);
                 $record['student_id'] = $local_sid;
 
-                // Check if this specific record exists (by time and student and type)
                 $exists = $wpdb->get_var($wpdb->prepare(
                     "SELECT id FROM {$wpdb->prefix}sm_records WHERE student_id = %d AND created_at = %s AND type = %s",
                     $local_sid, $record['created_at'], $record['type']
@@ -697,8 +825,9 @@ class SM_DB {
                 }
             }
         }
-        // 3. Process Attendance
-        if (isset($data['attendance'])) {
+
+        // 7. Restore Attendance
+        if (!empty($data['attendance'])) {
             foreach ($data['attendance'] as $att) {
                 $local_sid = $get_sid($att['student_code'] ?? '');
                 if (!$local_sid) continue;
@@ -714,6 +843,42 @@ class SM_DB {
                 }
             }
         }
+
+        // 8. Restore Exit Card Requests
+        if (!empty($data['exit_card_requests'])) {
+            foreach ($data['exit_card_requests'] as $req) {
+                $local_sid = $get_sid($req['student_code'] ?? '');
+                if (!$local_sid) continue;
+
+                $ref_no = $req['reference_no'] ?? '';
+                unset($req['id'], $req['student_code']);
+                $req['student_id'] = $local_sid;
+
+                $exists = null;
+                if (!empty($ref_no)) {
+                    $exists = $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}sm_exit_card_requests WHERE reference_no = %s", $ref_no));
+                }
+
+                if ($exists) {
+                    $wpdb->update("{$wpdb->prefix}sm_exit_card_requests", $req, array('id' => $exists));
+                } else {
+                    $wpdb->insert("{$wpdb->prefix}sm_exit_card_requests", $req);
+                }
+            }
+        }
+
+        // 9. Restore Plugin Settings
+        if (!empty($data['settings'])) {
+            foreach ($data['settings'] as $opt) {
+                $opt_name = $opt['option_name'] ?? '';
+                $opt_val  = $opt['option_value'] ?? '';
+                if (!empty($opt_name)) {
+                    update_option($opt_name, maybe_unserialize($opt_val));
+                }
+            }
+        }
+
+        wp_cache_flush();
         return true;
     }
 
