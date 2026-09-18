@@ -7821,124 +7821,137 @@ class SM_Public {
         }
 
         $processed = 0;
-        $next_sort_order = SM_DB::get_next_sort_order();
-        $academic = SM_Settings::get_academic_structure();
+        global $wpdb;
+
+        // Pre-cache institutions & schools in memory for high-speed row resolution
+        $cached_institutions = $wpdb->get_results("SELECT id, code, name FROM {$wpdb->prefix}eess_institutions WHERE status='active'", OBJECT_K);
+        $cached_schools      = $wpdb->get_results("SELECT id, school_code as code, name FROM {$wpdb->prefix}eess_schools WHERE status='active'", OBJECT_K);
 
         while ($processed < $chunk_size && ($data = fgetcsv($handle, 0, $delimiter)) !== FALSE) {
             $processed++;
             $row_index = $offset + $processed + 1;
 
-            $errors = array();
-            $warnings = array();
-
-            // Encoding
-            foreach ($data as $k => $v) {
-                $encoding = mb_detect_encoding($v, array('UTF-8', 'ISO-8859-6', 'ISO-8859-1'), true);
-                if ($encoding && $encoding != 'UTF-8') {
-                    $data[$k] = mb_convert_encoding($v, 'UTF-8', $encoding);
-                }
-            }
-
-            // Standard 12-Column Format Validation & Parsing
-            // Col 1: School Code, Col 2: Student Code, Col 3: Full Name, Col 4: National ID,
-            // Col 5: Gender, Col 6: DOB, Col 7: Nationality, Col 8: Emirate,
-            // Col 9: Grade, Col 10: Section, Col 11: Guardian Name, Col 12: Guardian Phone
-
-            if (count($data) < 12) {
-                $results['error']++;
-                $results['details'][] = array('type' => 'error', 'msg' => "السطر $row_index: يحتوي على " . count($data) . " عموداً فقط. يجب أن يتضمن ملف الاستيراد 12 عموداً بالترتيب المعتمد.");
-                continue;
-            }
-
-            $school_code_input   = trim($data[0] ?? '');
-            $student_code_input  = trim($data[1] ?? '');
-            $name_input          = trim($data[2] ?? '');
-            $national_id_input   = trim($data[3] ?? '');
-            $gender_input        = trim($data[4] ?? 'ذكر');
-            $dob_input           = trim($data[5] ?? '');
-            $nationality_input  = trim($data[6] ?? 'الإمارات العربية المتحدة');
-            $emirate_input       = trim($data[7] ?? 'الشارقة');
-            $grade_input         = trim($data[8] ?? '');
-            $section_input       = trim($data[9] ?? '');
-            $guardian_name_input = trim($data[10] ?? '');
-            $guardian_phone_input= trim($data[11] ?? '');
-
-            // 1. Validate School Code against registered institutions/schools
-            global $wpdb;
-            $inst_match = null;
-            if (!empty($school_code_input)) {
-                if (is_numeric($school_code_input)) {
-                    $inst_code = intval($school_code_input);
-                    $inst_match = $wpdb->get_row($wpdb->prepare("SELECT id, code, name FROM {$wpdb->prefix}eess_institutions WHERE code = %d OR id = %d LIMIT 1", $inst_code, $inst_code));
-                    if (!$inst_match) {
-                        $inst_match = $wpdb->get_row($wpdb->prepare("SELECT id, school_code as code, name FROM {$wpdb->prefix}eess_schools WHERE school_code = %d OR id = %d LIMIT 1", $inst_code, $inst_code));
+            try {
+                // Encoding Normalization
+                foreach ($data as $k => $v) {
+                    $encoding = mb_detect_encoding($v, array('UTF-8', 'ISO-8859-6', 'ISO-8859-1'), true);
+                    if ($encoding && $encoding != 'UTF-8') {
+                        $data[$k] = mb_convert_encoding($v, 'UTF-8', $encoding);
                     }
-                } else {
-                    $inst_match = $wpdb->get_row($wpdb->prepare("SELECT id, code, name FROM {$wpdb->prefix}eess_institutions WHERE name = %s OR code = %s LIMIT 1", $school_code_input, $school_code_input));
                 }
-            }
 
-            if (!empty($school_code_input) && !$inst_match) {
-                $results['error']++;
-                $results['details'][] = array('type' => 'error', 'msg' => "السطر $row_index: كود المدرسة '{$school_code_input}' غير صحيح أو غير مسجل بالنظام.");
-                continue;
-            }
-
-            // 2. Validate Student Full Name
-            if (empty($name_input)) {
-                $results['error']++;
-                $results['details'][] = array('type' => 'error', 'msg' => "السطر $row_index: اسم الطالب مفقود ولا يمكن استيراد البيانات بدون الاسم.");
-                continue;
-            }
-
-            // 3. Validate Grade Code
-            if (is_numeric($grade_input)) {
-                $grade_num = intval($grade_input);
-                if ($grade_num < 1 || $grade_num > 12) {
+                if (count($data) < 12) {
                     $results['error']++;
-                    $results['details'][] = array('type' => 'error', 'msg' => "السطر $row_index: كود الصف '{$grade_input}' غير صحيح (يجب أن يكون من 1 إلى 12).");
+                    $results['details'][] = array('type' => 'error', 'msg' => "السطر $row_index: يحتوي على " . count($data) . " عموداً فقط. يجب أن يتضمن ملف الاستيراد 12 عموداً بالترتيب المعتمد.");
                     continue;
                 }
-            }
 
-            $row_data = array(
-                'school_id'       => $inst_match ? $inst_match->id : 1,
-                'student_code'    => $student_code_input,
-                'name'            => $name_input,
-                'national_id'     => $national_id_input,
-                'gender'          => $gender_input,
-                'dob'             => $dob_input,
-                'nationality'     => $nationality_input,
-                'emirate'         => $emirate_input,
-                'class_name'      => $grade_input,
-                'section'         => $section_input,
-                'guardian_name'   => $guardian_name_input,
-                'guardian_phone'  => $guardian_phone_input
-            );
+                $school_code_input   = trim($data[0] ?? '');
+                $student_code_input  = trim($data[1] ?? '');
+                $name_input          = trim($data[2] ?? '');
+                $national_id_input   = trim($data[3] ?? '');
+                $gender_input        = trim($data[4] ?? 'ذكر');
+                $dob_input           = trim($data[5] ?? '');
+                $nationality_input  = trim($data[6] ?? 'الإمارات العربية المتحدة');
+                $emirate_input       = trim($data[7] ?? 'الشارقة');
+                $grade_input         = trim($data[8] ?? '');
+                $section_input       = trim($data[9] ?? '');
+                $guardian_name_input = trim($data[10] ?? '');
+                $guardian_phone_input= trim($data[11] ?? '');
 
-            $is_existing = false;
-            $check_code = $row_data['student_code'] ?? '';
-            $check_nat = $row_data['national_id'] ?? '';
-            if (!empty($check_code)) {
-                $is_existing = (bool) $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}sm_students WHERE student_code = %s", $check_code));
-            }
-            if (!$is_existing && !empty($check_nat)) {
-                $is_existing = (bool) $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}sm_students WHERE national_id = %s", $check_nat));
-            }
+                // 1. Validate School Code using pre-cached mapping
+                $inst_match_id = null;
+                if (!empty($school_code_input)) {
+                    if (is_numeric($school_code_input)) {
+                        $ic = intval($school_code_input);
+                        foreach ($cached_institutions as $ci) {
+                            if (intval($ci->code) === $ic || intval($ci->id) === $ic) {
+                                $inst_match_id = intval($ci->id);
+                                break;
+                            }
+                        }
+                        if (!$inst_match_id) {
+                            foreach ($cached_schools as $cs) {
+                                if (intval($cs->code) === $ic || intval($cs->id) === $ic) {
+                                    $inst_match_id = intval($cs->id);
+                                    break;
+                                }
+                            }
+                        }
+                    } else {
+                        foreach ($cached_institutions as $ci) {
+                            if ($ci->name === $school_code_input || (string)$ci->code === $school_code_input) {
+                                $inst_match_id = intval($ci->id);
+                                break;
+                            }
+                        }
+                    }
+                }
 
-            $saved_id = EESS_Student_Data_Service::process_and_save_student($row_data);
-            if (is_wp_error($saved_id)) {
+                if (!empty($school_code_input) && !$inst_match_id) {
+                    $results['error']++;
+                    $results['details'][] = array('type' => 'error', 'msg' => "السطر $row_index: كود المدرسة '{$school_code_input}' غير صحيح أو غير مسجل بالنظام.");
+                    continue;
+                }
+
+                // 2. Validate Student Full Name
+                if (empty($name_input)) {
+                    $results['error']++;
+                    $results['details'][] = array('type' => 'error', 'msg' => "السطر $row_index: اسم الطالب مفقود ولا يمكن استيراد البيانات بدون الاسم.");
+                    continue;
+                }
+
+                // 3. Validate Grade Code
+                if (is_numeric($grade_input)) {
+                    $grade_num = intval($grade_input);
+                    if ($grade_num < 1 || $grade_num > 12) {
+                        $results['error']++;
+                        $results['details'][] = array('type' => 'error', 'msg' => "السطر $row_index: كود الصف '{$grade_input}' غير صحيح (يجب أن يكون من 1 إلى 12).");
+                        continue;
+                    }
+                }
+
+                $row_data = array(
+                    'school_id'       => $inst_match_id ?: 1,
+                    'student_code'    => $student_code_input,
+                    'name'            => $name_input,
+                    'national_id'     => $national_id_input,
+                    'gender'          => $gender_input,
+                    'dob'             => $dob_input,
+                    'nationality'     => $nationality_input,
+                    'emirate'         => $emirate_input,
+                    'class_name'      => $grade_input,
+                    'section'         => $section_input,
+                    'guardian_name'   => $guardian_name_input,
+                    'guardian_phone'  => $guardian_phone_input
+                );
+
+                $is_existing = false;
+                if (!empty($student_code_input)) {
+                    $is_existing = (bool) $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}sm_students WHERE student_code = %s LIMIT 1", $student_code_input));
+                }
+                if (!$is_existing && !empty($national_id_input)) {
+                    $is_existing = (bool) $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}sm_students WHERE national_id = %s LIMIT 1", $national_id_input));
+                }
+
+                $saved_id = EESS_Student_Data_Service::process_and_save_student($row_data);
+                if (is_wp_error($saved_id)) {
+                    $results['error']++;
+                    $results['details'][] = array('type' => 'error', 'msg' => "السطر $row_index: " . $saved_id->get_error_message());
+                } else {
+                    $results['success']++;
+                    if ($is_existing) {
+                        $results['duplicate']++;
+                        $results['details'][] = array('type' => 'info', 'msg' => "تم تحديث سجل ({$name_input}) في السطر $row_index");
+                    }
+                    if (empty($student_code_input)) {
+                        $results['generated']++;
+                    }
+                }
+            } catch (\Throwable $ex) {
                 $results['error']++;
-                $results['details'][] = array('type' => 'error', 'msg' => "السطر $row_index: " . $saved_id->get_error_message());
-            } else {
-                $results['success']++;
-                if ($is_existing) {
-                    $results['duplicate']++;
-                    $results['details'][] = array('type' => 'info', 'msg' => "تم تحديث سجل ({$row_data['name']}) في السطر $row_index");
-                }
-                if (empty($row_data['student_code'])) {
-                    $results['generated']++;
-                }
+                $results['details'][] = array('type' => 'error', 'msg' => "السطر $row_index: خطأ في المعالجة — " . $ex->getMessage());
+                continue;
             }
         }
 
@@ -7952,9 +7965,14 @@ class SM_Public {
         }
 
         wp_send_json_success(array(
-            'processed' => $processed,
-            'finished'  => $is_finished,
-            'total_so_far' => $offset + $processed
+            'processed'        => $processed,
+            'finished'         => $is_finished,
+            'total_rows'       => $results['total'],
+            'processed_so_far' => $offset + $processed,
+            'success'          => $results['success'],
+            'duplicate'        => $results['duplicate'],
+            'error'            => $results['error'],
+            'details'          => $results['details']
         ));
     }
 
