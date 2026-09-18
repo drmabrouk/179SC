@@ -147,14 +147,13 @@ $to_num = min($offset + $limit, $total_students_count);
                 <span class="dashicons dashicons-external" style="font-size: 16px; width: 16px; height: 16px; color: #0f172a;"></span>
             </a>
 
-            <!-- Exit Card Requests Button -->
-            <?php
-            $exit_req_count = (int)$wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}sm_exit_card_requests WHERE status = 'submitted'");
-            ?>
-            <button type="button" onclick="document.getElementById('eess-exit-card-requests-modal').style.display='flex'" class="eess-hdr-btn" style="background: #f8fafc !important; color: #0284c7 !important; border: 1px solid #bae6fd !important; border-radius: 8px; padding: 0 12px; height: 34px; font-weight: 800; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
-                <span class="dashicons dashicons-id" style="font-size: 16px; width: 16px; height: 16px; color: #0284c7;"></span>
-                <span style="color: #0284c7 !important;">طلبات بطاقات الخروج (<?php echo $exit_req_count; ?>)</span>
+            <!-- Global Student PDF Export Button -->
+            <?php if ($is_admin || current_user_can('manage_options') || in_array('sm_system_admin', $roles)): ?>
+            <button type="button" onclick="document.getElementById('eess-student-export-pdf-modal').style.display='flex'" title="تصدير كشوف الطلاب للطباعة الرسمية (PDF)" class="eess-hdr-btn" style="background: #ffffff !important; color: #881337 !important; border: 1px solid #fecdd3 !important; border-radius: 8px; height: 34px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; cursor: pointer; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
+                <span class="dashicons dashicons-pdf" style="font-size: 18px; width: 18px; height: 18px; color: #881337;"></span>
+                <span>تصدير طباعة كشوف الطلاب</span>
             </button>
+            <?php endif; ?>
 
             <!-- System Administrator Controls Gear Button -->
             <?php if ($is_admin || current_user_can('manage_options') || in_array('sm_system_admin', $roles)): ?>
@@ -1506,6 +1505,52 @@ $to_num = min($offset + $limit, $total_students_count);
                 if (res.success) location.reload();
             });
         };
+
+        window.eessAdminDeleteAllStudentsGlobal = function() {
+            if (!confirm('تحذير أمني شديد الخطورة:\n\nهل أنت متأكد تماماً من حذف كافة سجلات الطلاب لجميع المؤسسات بالكامل؟\n\nلن يمكن التراجع عن هذا الإجراء!')) return;
+
+            const formData = new FormData();
+            formData.append('action', 'eess_admin_delete_all_students_global');
+            formData.append('nonce', '<?php echo wp_create_nonce("sm_admin_action"); ?>');
+
+            fetch('<?php echo admin_url('admin-ajax.php'); ?>', { method: 'POST', body: formData })
+            .then(r => r.json())
+            .then(res => {
+                alert(res.data.message || res.data);
+                if (res.success) location.reload();
+            });
+        };
+
+        window.eessAdminResetAllSequencesGlobal = function() {
+            if (!confirm('هل أنت متأكد من إعادة ضبط التسلسل الرقمي لكافة المؤسسات لجميع الأعوام الدراسية إلى 00001؟')) return;
+
+            const formData = new FormData();
+            formData.append('action', 'eess_admin_reset_all_student_sequences_global');
+            formData.append('nonce', '<?php echo wp_create_nonce("sm_admin_action"); ?>');
+
+            fetch('<?php echo admin_url('admin-ajax.php'); ?>', { method: 'POST', body: formData })
+            .then(r => r.json())
+            .then(res => {
+                alert(res.data.message || res.data);
+                if (res.success) location.reload();
+            });
+        };
+
+        window.eessTriggerExportStudentsPDF = function() {
+            const schoolId = document.getElementById('pdf_exp_school_id').value;
+            const classFilter = document.getElementById('pdf_exp_class_filter').value;
+            const secFilter = document.getElementById('pdf_exp_section_filter').value.trim();
+            const nonce = '<?php echo wp_create_nonce("sm_admin_action"); ?>';
+
+            let url = '<?php echo admin_url('admin-ajax.php?action=eess_export_students_pdf'); ?>';
+            url += '&school_id=' + encodeURIComponent(schoolId);
+            url += '&class_filter=' + encodeURIComponent(classFilter);
+            url += '&section_filter=' + encodeURIComponent(secFilter);
+            url += '&nonce=' + encodeURIComponent(nonce);
+            url += '&auto_print=1';
+
+            window.open(url, '_blank');
+        };
     })();
     </script>
 
@@ -1514,24 +1559,24 @@ $sysadmin_insts = class_exists('EESS_Org_Helper') ? EESS_Org_Helper::get_institu
 $acad_struct_cur = class_exists('SM_Settings') ? SM_Settings::get_academic_structure() : array();
 $current_acad_yr = $acad_struct_cur['academic_year'] ?? '2026/2027';
 ?>
-<!-- System Administrator Controls Modal (Gear Icon) -->
+<!-- System Administrator Controls Modal (Gear Icon - Clean White Header) -->
 <div id="eess-sysadmin-students-modal" class="sm-modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(4px); z-index: 999999; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; font-family: 'Cairo', sans-serif;" dir="rtl">
-    <div style="background: #ffffff; width: 100%; max-width: 650px; border-radius: 18px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); overflow: hidden; display: flex; flex-direction: column;">
+    <div style="background: #ffffff; width: 100%; max-width: 720px; border-radius: 20px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); overflow: hidden; display: flex; flex-direction: column;">
 
-        <!-- Header -->
-        <div style="background: #0f172a; color: #ffffff; padding: 18px 24px; display: flex; justify-content: space-between; align-items: center;">
+        <!-- Clean White Header with Black Title & Black Icon -->
+        <div style="background: #ffffff; color: #0f172a; padding: 20px 24px; border-bottom: 2px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
             <div style="display: flex; align-items: center; gap: 10px;">
-                <span class="dashicons dashicons-admin-generic" style="color: #38bdf8; font-size: 22px; width: 22px; height: 22px;"></span>
-                <h3 style="margin: 0; font-size: 16px; font-weight: 800;">إعدادات وضوابط شؤون الطلاب (مدير النظام)</h3>
+                <span class="dashicons dashicons-admin-generic" style="color: #0f172a; font-size: 24px; width: 24px; height: 24px;"></span>
+                <h3 style="margin: 0; font-size: 17px; font-weight: 900; color: #0f172a;">إعدادات وضوابط شؤون الطلاب (مدير النظام)</h3>
             </div>
-            <button type="button" onclick="document.getElementById('eess-sysadmin-students-modal').style.display='none'" style="background: none; border: none; color: #ffffff; font-size: 22px; cursor: pointer; font-weight: bold;">&times;</button>
+            <button type="button" onclick="document.getElementById('eess-sysadmin-students-modal').style.display='none'" style="background: none; border: none; color: #0f172a; font-size: 24px; cursor: pointer; font-weight: bold;">&times;</button>
         </div>
 
-        <div style="padding: 24px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 20px;">
+        <div style="padding: 24px; overflow-y: auto; max-height: 80vh; flex: 1; display: flex; flex-direction: column; gap: 20px;">
 
             <!-- Action 1: Academic Year Configuration -->
-            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;">
-                <div style="font-size: 13px; font-weight: 800; color: #0f172a; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px;">
+                <div style="font-size: 13.5px; font-weight: 800; color: #0f172a; margin-bottom: 6px; display: flex; align-items: center; gap: 8px;">
                     <span class="dashicons dashicons-calendar-alt" style="color: #2563eb;"></span>
                     <span>تحديد العام الدراسي المعتمد لأكواد الطلاب</span>
                 </div>
@@ -1542,32 +1587,35 @@ $current_acad_yr = $acad_struct_cur['academic_year'] ?? '2026/2027';
                 </div>
             </div>
 
-            <!-- Action 2: Reset Institution Serial Counter -->
-            <div style="background: #fffbebf8; border: 1px solid #fef3c7; border-radius: 12px; padding: 16px;">
-                <div style="font-size: 13px; font-weight: 800; color: #92400e; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+            <!-- Action 2: Reset Institution Serial Counter (Single & Global) -->
+            <div style="background: #fffbebf8; border: 1px solid #fef3c7; border-radius: 14px; padding: 18px;">
+                <div style="font-size: 13.5px; font-weight: 800; color: #92400e; margin-bottom: 6px; display: flex; align-items: center; gap: 8px;">
                     <span class="dashicons dashicons-update" style="color: #d97706;"></span>
-                    <span>إعادة ضبط التسلسل الرقمي للمؤسسة (Reset Serial Number)</span>
+                    <span>إعادة ضبط التسلسل الرقمي للمؤسسات (Reset Serial Numbers)</span>
                 </div>
                 <div style="font-size: 11.5px; color: #78350f; margin-bottom: 12px;">يعيد العداد الرقمي للطلاب الجدد للمؤسسة المحددة إلى 00001 دون مسح الطلاب الحاليين.</div>
-                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px;">
                     <select id="sys_reset_inst_id" class="sm-select" style="height: 38px; font-size: 12px; font-weight: 700; flex: 1;">
-                        <option value="">-- اختر المؤسسة --</option>
+                        <option value="">-- اختر المؤسسة لتعديل تسلسلاها --</option>
                         <?php foreach ($sysadmin_insts as $inst): ?>
                             <option value="<?php echo esc_attr($inst->id); ?>"><?php echo esc_html($inst->name); ?> (كود: <?php echo esc_html($inst->code); ?>)</option>
                         <?php endforeach; ?>
                     </select>
                     <button type="button" onclick="eessAdminResetSequence()" class="sm-btn" style="background: #d97706; color: #fff !important; height: 38px; font-size: 12px; font-weight: 800; border-radius: 8px;">إعادة ضبط العداد إلى 00001</button>
                 </div>
+                <div style="border-top: 1px dashed #fcd34d; padding-top: 10px; margin-top: 6px;">
+                    <button type="button" onclick="eessAdminResetAllSequencesGlobal()" class="sm-btn" style="background: #b45309; color: #fff !important; height: 36px; font-size: 11.5px; font-weight: 800; border-radius: 8px; width: 100%;">⚡ إعادة ضبط التسلسل الرقمي لكافة المؤسسات دفعة واحدة (Global Reset)</button>
+                </div>
             </div>
 
-            <!-- Action 3: Delete Students for Selected Institution -->
-            <div style="background: #fef2f2; border: 1px solid #fecdd3; border-radius: 12px; padding: 16px;">
-                <div style="font-size: 13px; font-weight: 800; color: #991b1b; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+            <!-- Action 3: Delete Students for Selected Institution / All Institutions -->
+            <div style="background: #fef2f2; border: 1px solid #fecdd3; border-radius: 14px; padding: 18px;">
+                <div style="font-size: 13.5px; font-weight: 800; color: #991b1b; margin-bottom: 6px; display: flex; align-items: center; gap: 8px;">
                     <span class="dashicons dashicons-trash" style="color: #dc2626;"></span>
-                    <span>حذف جميع طلاب مؤسسة محددة (Delete Students by Institution)</span>
+                    <span>حذف سجلات الطلاب الحذرة (Global & Institution Deletion)</span>
                 </div>
-                <div style="font-size: 11.5px; color: #7f1d1d; margin-bottom: 12px;">تحذير شديد الخطورة: يقوم بحذف سجلات الطلاب التابعين للمؤسسة المحددة فقط نهائياً من قاعدة البيانات.</div>
-                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <div style="font-size: 11.5px; color: #7f1d1d; margin-bottom: 12px;">تحذير شديد الخطورة: الإجراءات أدناه تقوم بحذف سجلات الطلاب نهائياً من قاعدة البيانات!</div>
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px;">
                     <select id="sys_del_inst_id" class="sm-select" style="height: 38px; font-size: 12px; font-weight: 700; flex: 1;">
                         <option value="">-- اختر المؤسسة المراد حذف طلابها --</option>
                         <?php foreach ($sysadmin_insts as $inst): ?>
@@ -1576,12 +1624,68 @@ $current_acad_yr = $acad_struct_cur['academic_year'] ?? '2026/2027';
                     </select>
                     <button type="button" onclick="eessAdminDeleteInstitutionStudents()" class="sm-btn" style="background: #dc2626; color: #fff !important; height: 38px; font-size: 12px; font-weight: 800; border-radius: 8px;">حذف طلاب المؤسسة المحددة</button>
                 </div>
+                <div style="border-top: 1px dashed #fca5a5; padding-top: 10px; margin-top: 6px;">
+                    <button type="button" onclick="eessAdminDeleteAllStudentsGlobal()" class="sm-btn" style="background: #991b1b; color: #fff !important; height: 38px; font-size: 12px; font-weight: 900; border-radius: 8px; width: 100%;">⚠️ حذف جميع سجلات الطلاب لكافة المؤسسات بالنظام (Delete All Students)</button>
+                </div>
             </div>
 
         </div>
 
         <div style="padding: 14px 24px; background: #f8fafc; border-top: 1px solid #e2e8f0; text-align: left;">
             <button type="button" onclick="document.getElementById('eess-sysadmin-students-modal').style.display='none'" class="sm-btn sm-btn-outline" style="height: 36px; padding: 0 18px; border-radius: 8px;">إغلاق</button>
+        </div>
+    </div>
+</div>
+
+<!-- GLOBAL STUDENT DATA PRINT / PDF EXPORT MODAL -->
+<div id="eess-student-export-pdf-modal" class="sm-modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(4px); z-index: 999999; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; font-family: 'Cairo', sans-serif;" dir="rtl">
+    <div style="background: #ffffff; width: 100%; max-width: 520px; border-radius: 20px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); overflow: hidden; display: flex; flex-direction: column;">
+        <div style="background: #ffffff; color: #0f172a; padding: 20px 24px; border-bottom: 2px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span class="dashicons dashicons-pdf" style="color: #881337; font-size: 24px; width: 24px; height: 24px;"></span>
+                <h3 style="margin: 0; font-size: 16px; font-weight: 900; color: #0f172a;">تصدير طباعة كشوف الطلاب الرسمية (PDF)</h3>
+            </div>
+            <button type="button" onclick="document.getElementById('eess-student-export-pdf-modal').style.display='none'" style="background: none; border: none; color: #0f172a; font-size: 24px; cursor: pointer; font-weight: bold;">&times;</button>
+        </div>
+
+        <div style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+            <div>
+                <label style="font-size: 12.5px; font-weight: 800; color: #0f172a; display: block; margin-bottom: 6px;">المدرسة / المؤسسة التعليمية:</label>
+                <select id="pdf_exp_school_id" class="sm-select" style="width: 100%; height: 40px; font-size: 12.5px; font-weight: 700; border-radius: 10px;">
+                    <option value="0">جميع المدارس والمؤسسات</option>
+                    <?php foreach ($sysadmin_insts as $inst): ?>
+                        <option value="<?php echo esc_attr($inst->id); ?>"><?php echo esc_html($inst->name); ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div>
+                <label style="font-size: 12.5px; font-weight: 800; color: #0f172a; display: block; margin-bottom: 6px;">الصف الدراسي:</label>
+                <select id="pdf_exp_class_filter" class="sm-select" style="width: 100%; height: 40px; font-size: 12.5px; font-weight: 700; border-radius: 10px;">
+                    <option value="">جميع الصفوف الدراسية (1 → 12)</option>
+                    <?php
+                    $academic = SM_Settings::get_academic_structure();
+                    foreach ($academic['active_grades'] as $grade_num) {
+                        $grade_label = 'الصف ' . $grade_num;
+                        echo '<option value="' . esc_attr($grade_label) . '">' . esc_html($grade_label) . '</option>';
+                    }
+                    ?>
+                </select>
+            </div>
+
+            <div>
+                <label style="font-size: 12.5px; font-weight: 800; color: #0f172a; display: block; margin-bottom: 6px;">الشعبة / الفصل:</label>
+                <input type="text" id="pdf_exp_section_filter" placeholder="مثال: أ أو جميع الشعب..." style="width: 100%; height: 40px; border-radius: 10px; border: 1px solid #cbd5e1; padding: 0 12px; font-size: 12.5px; font-weight: 700; box-sizing: border-box;">
+            </div>
+
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; font-size: 11.5px; color: #64748b; line-height: 1.5;">
+                يتضمن التقرير ترويسة رسمية لمؤسسة الشعلة، الشعار، الأكواد، الأسماء الكاملة، مرتبة تسلسلياً حسب الصف الدراسي والشعب.
+            </div>
+
+            <button type="button" onclick="eessTriggerExportStudentsPDF()" style="height: 44px; background: #881337; color: white; border: none; border-radius: 10px; font-weight: 900; font-size: 13.5px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <span class="dashicons dashicons-pdf"></span>
+                <span>توليد وتصدير كشف الطباعة (PDF) ➔</span>
+            </button>
         </div>
     </div>
 </div>

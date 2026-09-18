@@ -317,8 +317,24 @@ class EESS_Student_Data_Service {
         $fields['teacher_id'] = !empty($data['teacher_id']) ? intval($data['teacher_id']) : null;
 
         if ($student_id > 0) {
+            $existing_stu_row = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}sm_students WHERE id = %d", $student_id));
+            if ($existing_stu_row) {
+                // Preserve existing student data if newly provided field is empty or unsupplied during import merge
+                foreach ($fields as $fk => $fv) {
+                    if ((is_null($fv) || $fv === '' || $fv === '0000-00-00') && !empty($existing_stu_row->$fk) && $existing_stu_row->$fk !== '0000-00-00') {
+                        $fields[$fk] = $existing_stu_row->$fk;
+                    }
+                }
+                if (empty($fields['student_code']) && !empty($existing_stu_row->student_code)) {
+                    $fields['student_code'] = $existing_stu_row->student_code;
+                }
+                if (empty($fields['national_id']) && !empty($existing_stu_row->national_id)) {
+                    $fields['national_id'] = $existing_stu_row->national_id;
+                }
+            }
+
             // Check if institution was changed (transfer scenario)
-            $existing_inst_id = $wpdb->get_var($wpdb->prepare("SELECT institution_id FROM {$wpdb->prefix}sm_students WHERE id = %d", $student_id));
+            $existing_inst_id = $existing_stu_row ? intval($existing_stu_row->institution_id) : 0;
             if (empty($data['student_code']) && !empty($existing_inst_id) && intval($existing_inst_id) !== intval($institution_id)) {
                 // Institution changed and no manual code provided: Regenerate code for new institution
                 if (class_exists('EESS_ID_Code_Service')) {

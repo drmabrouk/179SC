@@ -8052,6 +8052,260 @@ class SM_Public {
         wp_send_json_success(array('message' => "تم حذف $deleted طالب تابع لمؤسسة ({$inst->name}) بنجاح."));
     }
 
+    public function ajax_eess_admin_delete_all_students_global() {
+        $user_roles = (array) wp_get_current_user()->roles;
+        $is_sys_admin = in_array('administrator', $user_roles, true) || in_array('sm_system_admin', $user_roles, true) || current_user_can('manage_options');
+        if (!$is_sys_admin) wp_send_json_error('عفواً، يتطلب هذا الإجراء صلاحيات مدير النظام فقط.');
+
+        check_ajax_referer('sm_admin_action', 'nonce');
+
+        global $wpdb;
+        $count = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}sm_students");
+        $wpdb->query("TRUNCATE TABLE {$wpdb->prefix}sm_students");
+
+        SM_Logger::log('حذف كافة الطلاب الشامل', "قام مدير النظام بحذف كافة سجلات الطلاب لجميع المؤسسات ($count طالب)");
+        wp_cache_flush();
+
+        wp_send_json_success(array('message' => "تم حذف جميع سجلات الطلاب ($count طالب) لجميع المؤسسات بنجاح."));
+    }
+
+    public function ajax_eess_admin_reset_all_student_sequences_global() {
+        $user_roles = (array) wp_get_current_user()->roles;
+        $is_sys_admin = in_array('administrator', $user_roles, true) || in_array('sm_system_admin', $user_roles, true) || current_user_can('manage_options');
+        if (!$is_sys_admin) wp_send_json_error('عفواً، يتطلب هذا الإجراء صلاحيات مدير النظام فقط.');
+
+        check_ajax_referer('sm_admin_action', 'nonce');
+
+        global $wpdb;
+        $wpdb->query("UPDATE {$wpdb->prefix}eess_id_counters SET current_val = 0 WHERE counter_type LIKE 'student_%'");
+
+        SM_Logger::log('إعادة ضبط تسلسل الأكواد الشامل', "قام مدير النظام بإعادة ضبط التسلسل الرقمي لكافة المؤسسات لجميع الأعوام الدراسية إلى 00001");
+        wp_cache_flush();
+
+        wp_send_json_success(array('message' => 'تم إعادة ضبط التسلسل الرقمي لأكواد الطلاب لجميع المؤسسات إلى 00001 بنجاح.'));
+    }
+
+    public function ajax_export_students_pdf() {
+        if (!current_user_can('إدارة_الطلاب') && !current_user_can('manage_options')) {
+            wp_die('عفواً، لا تمتلك صلاحية التصدير.');
+        }
+
+        if (!wp_verify_nonce($_GET['nonce'] ?? '', 'sm_admin_action') && !wp_verify_nonce($_GET['nonce'] ?? '', 'eess_admin_action')) {
+            wp_die('فشل التحقق الأمني.');
+        }
+
+        global $wpdb;
+
+        $school_id     = intval($_GET['school_id'] ?? 0);
+        $class_filter  = sanitize_text_field($_GET['class_filter'] ?? '');
+        $sec_filter    = sanitize_text_field($_GET['section_filter'] ?? '');
+
+        $where = array();
+        if ($school_id > 0) {
+            $where[] = $wpdb->prepare("(school_id = %d OR institution_id = %d)", $school_id, $school_id);
+        }
+        if (!empty($class_filter)) {
+            $where[] = $wpdb->prepare("class_name = %s", $class_filter);
+        }
+        if (!empty($sec_filter)) {
+            $where[] = $wpdb->prepare("section = %s", $sec_filter);
+        }
+
+        $sql = "SELECT * FROM {$wpdb->prefix}sm_students";
+        if (!empty($where)) {
+            $sql .= " WHERE " . implode(" AND ", $where);
+        }
+        $sql .= " ORDER BY name ASC";
+
+        $records = $wpdb->get_results($sql);
+
+        // Parse Grade numbers for sequential ordering (1 -> 12)
+        $get_grade_num = function($cname) {
+            if (preg_match('/(\d+)/', $cname, $m)) {
+                return intval($m[1]);
+            }
+            return 99;
+        };
+
+        // Group students by Grade (1 -> 12) and Section (A, B, C...)
+        usort($records, function($a, $b) use ($get_grade_num) {
+            $gA = $get_grade_num($a->class_name);
+            $gB = $get_grade_num($b->class_name);
+            if ($gA !== $gB) return $gA <=> $gB;
+
+            $secA = trim($a->section);
+            $secB = trim($b->section);
+            if ($secA !== $secB) return strcmp($secA, $secB);
+
+            return strcmp($a->name, $b->name);
+        });
+
+        $school_info = SM_Settings::get_school_info();
+        $sys_logo = !empty($school_info['school_logo']) ? $school_info['school_logo'] : (!empty($school_info['logo_url']) ? $school_info['logo_url'] : SM_PLUGIN_URL . 'assets/images/logo.png');
+        $org_title = 'مؤسسة الشعلة للتعليم والتطوير';
+
+        $inst_name = 'جميع المدارس والمؤسسات';
+        if ($school_id > 0) {
+            $inst_obj = $wpdb->get_row($wpdb->prepare("SELECT name FROM {$wpdb->prefix}eess_institutions WHERE id = %d", $school_id));
+            if ($inst_obj) $inst_name = $inst_obj->name;
+        }
+
+        header('Content-Type: text/html; charset=utf-8');
+        ?>
+        <!DOCTYPE html>
+        <html lang="ar" dir="rtl">
+        <head>
+            <meta charset="UTF-8">
+            <title>كشف بيانات أسر وأكواد الطلاب الرسمية</title>
+            <style>
+                @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800;900&display=swap');
+                body {
+                    font-family: 'Cairo', sans-serif;
+                    direction: rtl;
+                    margin: 0;
+                    padding: 20px;
+                    background: #ffffff;
+                    color: #0f172a;
+                    font-size: 12px;
+                }
+                .pdf-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    border-bottom: 2px solid #0f172a;
+                    padding-bottom: 12px;
+                    margin-bottom: 18px;
+                }
+                .pdf-header-title {
+                    font-size: 18px;
+                    font-weight: 900;
+                    color: #0f172a;
+                    margin: 0 0 4px 0;
+                }
+                .pdf-header-sub {
+                    font-size: 12px;
+                    color: #881337;
+                    font-weight: 800;
+                }
+                .pdf-meta-box {
+                    background: #f8fafc;
+                    border: 1px solid #cbd5e1;
+                    border-radius: 10px;
+                    padding: 10px 14px;
+                    margin-bottom: 16px;
+                    display: flex;
+                    justify-content: space-between;
+                    font-size: 11.5px;
+                    font-weight: 700;
+                }
+                table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin-bottom: 20px;
+                }
+                th {
+                    background-color: #0f172a;
+                    color: #ffffff;
+                    font-weight: 800;
+                    padding: 8px 10px;
+                    border: 1px solid #0f172a;
+                    font-size: 11.5px;
+                    text-align: center;
+                }
+                td {
+                    padding: 7px 10px;
+                    border: 1px solid #cbd5e1;
+                    font-size: 11.5px;
+                    text-align: center;
+                    font-weight: 700;
+                }
+                tr:nth-child(even) {
+                    background-color: #f8fafc;
+                }
+                .code-badge {
+                    font-family: monospace;
+                    font-weight: 900;
+                    color: #881337;
+                    font-size: 12.5px;
+                }
+                @media print {
+                    @page {
+                        size: A4 portrait;
+                        margin: 12mm;
+                    }
+                    body { padding: 0; }
+                    .no-print { display: none; }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="no-print" style="margin-bottom: 15px; text-align: left;">
+                <button onclick="window.print()" style="padding: 10px 24px; background: #881337; color: white; border: none; border-radius: 8px; font-weight: 800; font-size: 13px; cursor: pointer;">🖨️ طباعة الكشف (PDF)</button>
+            </div>
+
+            <div class="pdf-header">
+                <div>
+                    <h1 class="pdf-header-title"><?php echo esc_html($org_title); ?></h1>
+                    <div class="pdf-header-sub"><?php echo esc_html($inst_name); ?></div>
+                    <div style="font-size: 13px; font-weight: 900; color: #0f172a; margin-top: 4px;">الكشف الرسمي لبيانات وأكواد الطلاب</div>
+                </div>
+                <div>
+                    <img src="<?php echo esc_url($sys_logo); ?>" style="max-height: 70px; object-fit: contain;" alt="Logo">
+                </div>
+            </div>
+
+            <div class="pdf-meta-box">
+                <div><strong>الصف الدراسي:</strong> <?php echo esc_html($class_filter ?: 'جميع الصفوف'); ?></div>
+                <div><strong>الشعبة:</strong> <?php echo esc_html($sec_filter ?: 'جميع الشعب'); ?></div>
+                <div><strong>عدد الطلاب:</strong> <?php echo count($records); ?> طالب</div>
+                <div><strong>تاريخ الطباعة:</strong> <?php echo current_time('Y-m-d'); ?></div>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 40px;">#</th>
+                        <th style="width: 130px;">كود الطالب</th>
+                        <th>الاسم الكامل للطالب</th>
+                        <th style="width: 100px;">الصف</th>
+                        <th style="width: 70px;">الشعبة</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php
+                    $idx = 1;
+                    foreach ($records as $r):
+                    ?>
+                    <tr>
+                        <td><?php echo $idx++; ?></td>
+                        <td class="code-badge"><?php echo esc_html($r->student_code); ?></td>
+                        <td style="text-align: right; padding-right: 14px;"><?php echo esc_html($r->name); ?></td>
+                        <td><?php echo esc_html($r->class_name); ?></td>
+                        <td><?php echo esc_html($r->section); ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+
+            <div style="margin-top: 30px; display: flex; justify-content: space-between; font-size: 11px; font-weight: 800; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 10px;">
+                <div>مؤسسة الشعلة للتعليم والتطوير — قسم شؤون الطلاب</div>
+                <div>تقرير رسمي معتمد صادر من النظام الإلكتروني</div>
+            </div>
+
+            <script>
+                window.onload = function() {
+                    // Auto open print dialog if requested
+                    if (window.location.search.indexOf('auto_print=1') !== -1) {
+                        window.print();
+                    }
+                };
+            </script>
+        </body>
+        </html>
+        <?php
+        exit;
+    }
+
     public function ajax_eess_admin_reset_student_sequence() {
         $user_roles = (array) wp_get_current_user()->roles;
         $is_sys_admin = in_array('administrator', $user_roles, true) || in_array('sm_system_admin', $user_roles, true) || current_user_can('manage_options');
