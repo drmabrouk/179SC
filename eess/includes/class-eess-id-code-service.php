@@ -154,22 +154,40 @@ class EESS_ID_Code_Service {
     }
 
     /**
-     * Generates a unique Student Code based on System Administrator Central Configuration
+     * Extracts 4-digit academic year prefix (e.g. '2026/2027' -> '2627')
+     */
+    public static function get_academic_year_code() {
+        $acad_struct = class_exists('SM_Settings') ? SM_Settings::get_academic_structure() : array();
+        $raw_year = $acad_struct['academic_year'] ?? '2026/2027';
+
+        preg_match_all('/\d+/', $raw_year, $matches);
+        if (!empty($matches[0])) {
+            $nums = $matches[0];
+            if (count($nums) >= 2) {
+                $y1 = substr($nums[0], -2);
+                $y2 = substr($nums[1], -2);
+                return $y1 . $y2;
+            } elseif (count($nums) == 1 && strlen($nums[0]) == 4) {
+                return $nums[0];
+            }
+        }
+        return '2627';
+    }
+
+    /**
+     * Generates a unique Student Code in format: [AcadYearCode][InstCode][5-Digit Serial] (e.g., 2627200001)
      */
     public static function generate_student_code($inst_id = 1) {
         global $wpdb;
         $inst_code = self::get_institution_code($inst_id);
-        $config = self::get_numbering_config();
+        $acad_prefix = self::get_academic_year_code();
+        $counter_key = 'student_' . $acad_prefix;
 
         do {
-            $seq = self::get_next_sequence($inst_id, 'student');
-            $seq_str = sprintf("%0" . $config['student_digits'] . "d", $seq);
+            $seq = self::get_next_sequence($inst_id, $counter_key);
+            $seq_str = sprintf("%05d", $seq);
 
-            $code = $config['student_prefix'] . str_replace(
-                array('{inst_code}', '{seq}', '{year}'),
-                array($inst_code, $seq_str, date('Y')),
-                $config['student_format']
-            );
+            $code = $acad_prefix . $inst_code . $seq_str;
 
             $exists = $wpdb->get_var($wpdb->prepare(
                 "SELECT id FROM {$wpdb->prefix}sm_students WHERE student_code = %s LIMIT 1",

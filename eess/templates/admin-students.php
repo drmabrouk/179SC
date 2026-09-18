@@ -156,6 +156,13 @@ $to_num = min($offset + $limit, $total_students_count);
                 <span style="color: #0284c7 !important;">طلبات بطاقات الخروج (<?php echo $exit_req_count; ?>)</span>
             </button>
 
+            <!-- System Administrator Controls Gear Button -->
+            <?php if ($is_admin || current_user_can('manage_options') || in_array('sm_system_admin', $roles)): ?>
+            <button type="button" onclick="document.getElementById('eess-sysadmin-students-modal').style.display='flex'" title="إعدادات وضوابط مدير النظام" class="eess-hdr-btn" style="background: #0f172a !important; color: #ffffff !important; border: 1px solid #0f172a !important; border-radius: 8px; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.08);">
+                <span class="dashicons dashicons-admin-generic" style="font-size: 18px; width: 18px; height: 18px; color: #ffffff;"></span>
+            </button>
+            <?php endif; ?>
+
             <!-- Primary Action: Add Student (Wine Red) -->
             <?php if ($is_admin): ?>
             <button type="button" onclick="openAddStudentWizard()" class="sm-btn sm-btn-custom" style="background: #881337; color: #ffffff; border: none; border-radius: 8px; padding: 0 16px; height: 34px; font-weight: 800; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; box-shadow: 0 2px 8px rgba(136, 19, 55, 0.2); transition: all 0.2s;" onmouseover="this.style.background='#700c2a'" onmouseout="this.style.background='#881337'">
@@ -1444,6 +1451,138 @@ $to_num = min($offset + $limit, $total_students_count);
                 });
             });
         }
+
+        window.eessAdminSaveAcademicYear = function() {
+            const yearVal = document.getElementById('sys_input_acad_year').value.trim();
+            if (!yearVal) { alert('يرجى إدخال العام الدراسي.'); return; }
+            const formData = new FormData();
+            formData.append('action', 'eess_admin_update_academic_year');
+            formData.append('academic_year', yearVal);
+            formData.append('nonce', '<?php echo wp_create_nonce("sm_admin_action"); ?>');
+
+            fetch('<?php echo admin_url('admin-ajax.php'); ?>', { method: 'POST', body: formData })
+            .then(r => r.json())
+            .then(res => {
+                alert(res.data.message || res.data);
+                if (res.success) location.reload();
+            });
+        };
+
+        window.eessAdminResetSequence = function() {
+            const instId = document.getElementById('sys_reset_inst_id').value;
+            if (!instId) { alert('يرجى اختيار المؤسسة أولاً.'); return; }
+            if (!confirm('هل أنت تأكد من إعادة ضبط العداد الرقمي للطلاب الجدد لهذه المؤسسة إلى 00001؟ لن يتم تغيير أكواد الطلاب الحاليين.')) return;
+
+            const formData = new FormData();
+            formData.append('action', 'eess_admin_reset_student_sequence');
+            formData.append('inst_id', instId);
+            formData.append('nonce', '<?php echo wp_create_nonce("sm_admin_action"); ?>');
+
+            fetch('<?php echo admin_url('admin-ajax.php'); ?>', { method: 'POST', body: formData })
+            .then(r => r.json())
+            .then(res => {
+                alert(res.data.message || res.data);
+                if (res.success) location.reload();
+            });
+        };
+
+        window.eessAdminDeleteInstitutionStudents = function() {
+            const instSelect = document.getElementById('sys_del_inst_id');
+            const instId = instSelect.value;
+            const instName = instSelect.options[instSelect.selectedIndex].text;
+            if (!instId) { alert('يرجى اختيار المؤسسة المراد مسح طلابها أولاً.'); return; }
+
+            if (!confirm(`تحذير مؤكد وخاطر جداً:\n\nهل أنت متأكد من حذف جميع سجلات الطلاب التابعين لمؤسسة:\n(${instName})\n\nهذا الإجراء سيقوم بحذف سجلات الطلاب نهائياً ولن يمكن التراجع عنه!`)) return;
+
+            const formData = new FormData();
+            formData.append('action', 'eess_admin_delete_institution_students');
+            formData.append('inst_id', instId);
+            formData.append('nonce', '<?php echo wp_create_nonce("sm_admin_action"); ?>');
+
+            fetch('<?php echo admin_url('admin-ajax.php'); ?>', { method: 'POST', body: formData })
+            .then(r => r.json())
+            .then(res => {
+                alert(res.data.message || res.data);
+                if (res.success) location.reload();
+            });
+        };
     })();
     </script>
+
+<?php
+$sysadmin_insts = class_exists('EESS_Org_Helper') ? EESS_Org_Helper::get_institutions() : array();
+$acad_struct_cur = class_exists('SM_Settings') ? SM_Settings::get_academic_structure() : array();
+$current_acad_yr = $acad_struct_cur['academic_year'] ?? '2026/2027';
+?>
+<!-- System Administrator Controls Modal (Gear Icon) -->
+<div id="eess-sysadmin-students-modal" class="sm-modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(4px); z-index: 999999; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; font-family: 'Cairo', sans-serif;" dir="rtl">
+    <div style="background: #ffffff; width: 100%; max-width: 650px; border-radius: 18px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); overflow: hidden; display: flex; flex-direction: column;">
+
+        <!-- Header -->
+        <div style="background: #0f172a; color: #ffffff; padding: 18px 24px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span class="dashicons dashicons-admin-generic" style="color: #38bdf8; font-size: 22px; width: 22px; height: 22px;"></span>
+                <h3 style="margin: 0; font-size: 16px; font-weight: 800;">إعدادات وضوابط شؤون الطلاب (مدير النظام)</h3>
+            </div>
+            <button type="button" onclick="document.getElementById('eess-sysadmin-students-modal').style.display='none'" style="background: none; border: none; color: #ffffff; font-size: 22px; cursor: pointer; font-weight: bold;">&times;</button>
+        </div>
+
+        <div style="padding: 24px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 20px;">
+
+            <!-- Action 1: Academic Year Configuration -->
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;">
+                <div style="font-size: 13px; font-weight: 800; color: #0f172a; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                    <span class="dashicons dashicons-calendar-alt" style="color: #2563eb;"></span>
+                    <span>تحديد العام الدراسي المعتمد لأكواد الطلاب</span>
+                </div>
+                <div style="font-size: 11.5px; color: #64748b; margin-bottom: 12px;">يحدد بادئة العام الدراسي (مثال: 2026/2027 ينتج كود 2627).</div>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <input type="text" id="sys_input_acad_year" value="<?php echo esc_attr($current_acad_yr); ?>" class="sm-input" placeholder="مثال: 2026/2027" style="height: 38px; font-size: 12.5px; font-weight: bold; width: 200px;">
+                    <button type="button" onclick="eessAdminSaveAcademicYear()" class="sm-btn" style="background: #2563eb; color: #fff !important; height: 38px; font-size: 12px; font-weight: 800; border-radius: 8px;">حفظ العام الدراسي</button>
+                </div>
+            </div>
+
+            <!-- Action 2: Reset Institution Serial Counter -->
+            <div style="background: #fffbebf8; border: 1px solid #fef3c7; border-radius: 12px; padding: 16px;">
+                <div style="font-size: 13px; font-weight: 800; color: #92400e; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                    <span class="dashicons dashicons-update" style="color: #d97706;"></span>
+                    <span>إعادة ضبط التسلسل الرقمي للمؤسسة (Reset Serial Number)</span>
+                </div>
+                <div style="font-size: 11.5px; color: #78350f; margin-bottom: 12px;">يعيد العداد الرقمي للطلاب الجدد للمؤسسة المحددة إلى 00001 دون مسح الطلاب الحاليين.</div>
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <select id="sys_reset_inst_id" class="sm-select" style="height: 38px; font-size: 12px; font-weight: 700; flex: 1;">
+                        <option value="">-- اختر المؤسسة --</option>
+                        <?php foreach ($sysadmin_insts as $inst): ?>
+                            <option value="<?php echo esc_attr($inst->id); ?>"><?php echo esc_html($inst->name); ?> (كود: <?php echo esc_html($inst->code); ?>)</option>
+                        <?php endforeach; ?>
+                    </select>
+                    <button type="button" onclick="eessAdminResetSequence()" class="sm-btn" style="background: #d97706; color: #fff !important; height: 38px; font-size: 12px; font-weight: 800; border-radius: 8px;">إعادة ضبط العداد إلى 00001</button>
+                </div>
+            </div>
+
+            <!-- Action 3: Delete Students for Selected Institution -->
+            <div style="background: #fef2f2; border: 1px solid #fecdd3; border-radius: 12px; padding: 16px;">
+                <div style="font-size: 13px; font-weight: 800; color: #991b1b; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                    <span class="dashicons dashicons-trash" style="color: #dc2626;"></span>
+                    <span>حذف جميع طلاب مؤسسة محددة (Delete Students by Institution)</span>
+                </div>
+                <div style="font-size: 11.5px; color: #7f1d1d; margin-bottom: 12px;">تحذير شديد الخطورة: يقوم بحذف سجلات الطلاب التابعين للمؤسسة المحددة فقط نهائياً من قاعدة البيانات.</div>
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <select id="sys_del_inst_id" class="sm-select" style="height: 38px; font-size: 12px; font-weight: 700; flex: 1;">
+                        <option value="">-- اختر المؤسسة المراد حذف طلابها --</option>
+                        <?php foreach ($sysadmin_insts as $inst): ?>
+                            <option value="<?php echo esc_attr($inst->id); ?>"><?php echo esc_html($inst->name); ?> (كود: <?php echo esc_html($inst->code); ?>)</option>
+                        <?php endforeach; ?>
+                    </select>
+                    <button type="button" onclick="eessAdminDeleteInstitutionStudents()" class="sm-btn" style="background: #dc2626; color: #fff !important; height: 38px; font-size: 12px; font-weight: 800; border-radius: 8px;">حذف طلاب المؤسسة المحددة</button>
+                </div>
+            </div>
+
+        </div>
+
+        <div style="padding: 14px 24px; background: #f8fafc; border-top: 1px solid #e2e8f0; text-align: left;">
+            <button type="button" onclick="document.getElementById('eess-sysadmin-students-modal').style.display='none'" class="sm-btn sm-btn-outline" style="height: 36px; padding: 0 18px; border-radius: 8px;">إغلاق</button>
+        </div>
+    </div>
+</div>
 </div>
