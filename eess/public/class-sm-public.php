@@ -13861,35 +13861,76 @@ class SM_Public {
         return ob_get_clean();
     }
 
+    public static function normalize_arabic_str($str) {
+        if (empty($str)) return '';
+        $str = trim($str);
+        $str = preg_replace('/[\x{064B}-\x{0652}]/u', '', $str);
+        $str = preg_replace('/[إأآآ]/u', 'ا', $str);
+        $str = preg_replace('/ة/u', 'ه', $str);
+        $str = preg_replace('/ى/u', 'ي', $str);
+        $str = preg_replace('/\s+/u', ' ', $str);
+        return mb_strtolower($str, 'UTF-8');
+    }
+
     public function ajax_public_search_student() {
         $name_query = sanitize_text_field($_POST['name_query'] ?? '');
         $clean_query = trim($name_query);
 
-        if (mb_strlen($clean_query) < 10) {
-            wp_send_json_error('يرجى إدخال 10 حروف على الأقل من بداية اسم الطالب للبحث.');
+        if (mb_strlen($clean_query) < 1) {
+            wp_send_json_error('يرجى إدخال اسم الطالب للبحث.');
         }
 
         global $wpdb;
-        $sql = "SELECT id, name, class_name, section FROM {$wpdb->prefix}sm_students WHERE name LIKE %s ORDER BY name ASC LIMIT 10";
-        $results = $wpdb->get_results($wpdb->prepare($sql, $wpdb->esc_like($clean_query) . '%'));
+        $norm_query = self::normalize_arabic_str($clean_query);
+
+        $words = array_filter(explode(' ', $clean_query));
+        $where = array();
+        $params = array();
+
+        foreach ($words as $word) {
+            if (mb_strlen($word) >= 2) {
+                $where[] = "name LIKE %s";
+                $params[] = '%' . $wpdb->esc_like($word) . '%';
+            }
+        }
+
+        if (empty($where)) {
+            $sql = "SELECT id, name, class_name, section FROM {$wpdb->prefix}sm_students WHERE name LIKE %s ORDER BY name ASC LIMIT 15";
+            $results = $wpdb->get_results($wpdb->prepare($sql, '%' . $wpdb->esc_like($clean_query) . '%'));
+        } else {
+            $sql = "SELECT id, name, class_name, section FROM {$wpdb->prefix}sm_students WHERE " . implode(" AND ", $where) . " ORDER BY name ASC LIMIT 15";
+            $results = $wpdb->get_results($wpdb->prepare($sql, $params));
+            if (empty($results)) {
+                $sql = "SELECT id, name, class_name, section FROM {$wpdb->prefix}sm_students WHERE " . implode(" OR ", $where) . " ORDER BY name ASC LIMIT 15";
+                $results = $wpdb->get_results($wpdb->prepare($sql, $params));
+            }
+        }
 
         if (empty($results)) {
-            wp_send_json_error('لم يتم العثور على طالب يطابق بداية الاسم المدخل.');
+            wp_send_json_error('لم يتم العثور على طالب يطابق الاسم المدخل.');
         }
 
         $safe_suggestions = array();
         foreach ($results as $s) {
-            $name_parts = explode(' ', trim($s->name));
-            $display_name = count($name_parts) >= 2 ? ($name_parts[0] . ' ' . $name_parts[count($name_parts)-1]) : $s->name;
+            $norm_name = self::normalize_arabic_str($s->name);
+            $exact_match = ($norm_name === $norm_query || strpos($norm_name, $norm_query) === 0);
+
             $safe_suggestions[] = array(
                 'id' => $s->id,
-                'display_name' => $display_name,
+                'display_name' => $s->name,
                 'class_name' => $s->class_name ?: 'الصف الدراسي',
-                'section' => $s->section ?: 'أ'
+                'section' => $s->section ?: 'أ',
+                'exact_match' => $exact_match
             );
         }
 
-        wp_send_json_success($safe_suggestions);
+        usort($safe_suggestions, function($a, $b) {
+            if ($a['exact_match'] && !$b['exact_match']) return -1;
+            if (!$a['exact_match'] && $b['exact_match']) return 1;
+            return strcmp($a['display_name'], $b['display_name']);
+        });
+
+        wp_send_json_success(array_slice($safe_suggestions, 0, 10));
     }
 
     public function ajax_public_verify_student() {
@@ -13935,11 +13976,40 @@ class SM_Public {
         $total_prev_requests = count($req_history);
 
         $settings = get_option('sm_exit_card_settings', array(
+            'portal_mode' => 'card_application',
+            'required_fields' => array('guardian_phone', 'dob'),
             'max_requests' => 3,
             'redirect_discipline' => 'yes'
         ));
+
+        $portal_mode = $settings['portal_mode'] ?? 'card_application';
+        $enabled_fields = (array) ($settings['required_fields'] ?? array('guardian_phone', 'dob'));
         $max_reqs = intval($settings['max_requests'] ?? 3);
         $exceeded_limit = ($total_prev_requests >= $max_reqs);
+
+        // Dynamically evaluate missing required fields
+        $missing_fields = array();
+        $field_values = array();
+
+        foreach ($enabled_fields as $fk) {
+            $val = trim((string)($student->$fk ?? ''));
+            $field_values[$fk] = $val;
+
+            if ($fk === 'guardian_phone') {
+                $digits = preg_replace('/\D/', '', $val);
+                if (strlen($digits) < 8) {
+                    $missing_fields[] = 'guardian_phone';
+                }
+            } elseif ($fk === 'dob') {
+                if (empty($val) || $val === '0000-00-00') {
+                    $missing_fields[] = 'dob';
+                }
+            } else {
+                if (empty($val)) {
+                    $missing_fields[] = $fk;
+                }
+            }
+        }
 
         $has_photo = !empty($student->photo_url);
 
@@ -13950,8 +14020,19 @@ class SM_Public {
                 'student_code' => $student->student_code ?: ('STU-' . $student->id),
                 'class_name' => $student->class_name ?: 'الصف الدراسي',
                 'section' => $student->section ?: 'أ',
-                'photo_url' => $student->photo_url ?: ''
+                'photo_url' => $student->photo_url ?: '',
+                'guardian_phone' => $student->guardian_phone ?: '',
+                'dob' => $student->dob ?: '',
+                'gender' => $student->gender ?: '',
+                'guardian_name' => $student->guardian_name ?: '',
+                'emirate' => $student->emirate ?: '',
+                'address' => $student->address ?: '',
+                'nationality' => $student->nationality ?: '',
+                'national_id' => $student->national_id ?: ''
             ),
+            'portal_mode' => $portal_mode,
+            'enabled_fields' => $enabled_fields,
+            'missing_fields' => $missing_fields,
             'has_photo' => $has_photo,
             'active_request' => $active_req ? array(
                 'reference_no' => $active_req->reference_no ?: ('EXT-' . date('Y') . '-' . $active_req->id),
@@ -13963,6 +14044,140 @@ class SM_Public {
             'total_prev_requests' => $total_prev_requests,
             'exceeded_limit' => $exceeded_limit,
             'max_allowed' => $max_reqs
+        ));
+    }
+
+    public function ajax_public_update_student_missing_data() {
+        $student_id  = intval($_POST['student_id'] ?? 0);
+        $verify_code = sanitize_text_field($_POST['verify_code'] ?? '');
+
+        if (!$student_id || empty($verify_code)) {
+            wp_send_json_error('بيانات التحقق غير مكتملة.');
+        }
+
+        $student = SM_DB::get_student_by_id($student_id);
+        if (!$student) {
+            wp_send_json_error('سجل الطالب غير موجود.');
+        }
+
+        $clean_input = strtolower(trim($verify_code));
+        $stu_code = strtolower(trim($student->student_code ?: ''));
+        $nat_id   = strtolower(trim($student->national_id ?: ''));
+
+        $matched = ($clean_input === $stu_code || $clean_input === $nat_id);
+        if (!$matched) {
+            wp_send_json_error('رمز التحقق غير مطابق لبيانات الطالب المسجلة.');
+        }
+
+        $update_data = array();
+
+        // 1. Guardian Phone (Enforce +971 UAE Fixed Prefix)
+        if (isset($_POST['guardian_phone'])) {
+            $raw_phone = trim(sanitize_text_field($_POST['guardian_phone']));
+            $digits = preg_replace('/\D/', '', $raw_phone);
+            if (strpos($digits, '971') === 0) {
+                $digits = substr($digits, 3);
+            }
+            $digits = ltrim($digits, '0');
+            if (strlen($digits) < 7) {
+                wp_send_json_error('يرجى إدخال رقم هاتف إماراتي صحيح لولي الأمر.');
+            }
+            $update_data['guardian_phone'] = '+971 ' . $digits;
+        }
+
+        // 2. Date of Birth
+        if (isset($_POST['dob'])) {
+            $raw_dob = trim(sanitize_text_field($_POST['dob']));
+            if (!empty($raw_dob)) {
+                if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $raw_dob)) {
+                    wp_send_json_error('صيغة تاريخ الميلاد غير صحيحة. استخدم YYYY-MM-DD.');
+                }
+                $update_data['dob'] = $raw_dob;
+            }
+        }
+
+        // 3. Gender
+        if (isset($_POST['gender'])) {
+            $g = sanitize_text_field($_POST['gender']);
+            if (in_array($g, array('ذكر', 'أنثى', 'Male', 'Female'), true)) {
+                $update_data['gender'] = ($g === 'Female' || $g === 'أنثى') ? 'أنثى' : 'ذكر';
+            }
+        }
+
+        // 4. Guardian Name
+        if (isset($_POST['guardian_name']) && !empty($_POST['guardian_name'])) {
+            $update_data['guardian_name'] = sanitize_text_field($_POST['guardian_name']);
+        }
+
+        // 5. Emirate
+        if (isset($_POST['emirate']) && !empty($_POST['emirate'])) {
+            $update_data['emirate'] = sanitize_text_field($_POST['emirate']);
+        }
+
+        // 6. Address
+        if (isset($_POST['address']) && !empty($_POST['address'])) {
+            $update_data['address'] = sanitize_textarea_field($_POST['address']);
+        }
+
+        // 7. Nationality
+        if (isset($_POST['nationality']) && !empty($_POST['nationality'])) {
+            $update_data['nationality'] = sanitize_text_field($_POST['nationality']);
+        }
+
+        // 8. National ID
+        if (isset($_POST['national_id']) && !empty($_POST['national_id'])) {
+            $nid = sanitize_text_field($_POST['national_id']);
+            global $wpdb;
+            $existing_nat = $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}sm_students WHERE national_id = %s AND id != %d", $nid, $student_id));
+            if ($existing_nat) {
+                wp_send_json_error('رقم الهوية الوطنية مسجل بالفعل لطالب آخر.');
+            }
+            $update_data['national_id'] = $nid;
+        }
+
+        if (!empty($update_data)) {
+            global $wpdb;
+            $wpdb->update("{$wpdb->prefix}sm_students", $update_data, array('id' => $student_id));
+            wp_cache_flush();
+        }
+
+        // Re-read updated student
+        $updated_stu = SM_DB::get_student_by_id($student_id);
+
+        $settings = get_option('sm_exit_card_settings', array(
+            'portal_mode' => 'card_application',
+            'required_fields' => array('guardian_phone', 'dob')
+        ));
+        $enabled_fields = (array) ($settings['required_fields'] ?? array('guardian_phone', 'dob'));
+        $rem_missing = array();
+
+        foreach ($enabled_fields as $fk) {
+            $val = trim((string)($updated_stu->$fk ?? ''));
+            if ($fk === 'guardian_phone') {
+                $digits = preg_replace('/\D/', '', $val);
+                if (strlen($digits) < 8) $rem_missing[] = 'guardian_phone';
+            } elseif ($fk === 'dob') {
+                if (empty($val) || $val === '0000-00-00') $rem_missing[] = 'dob';
+            } else {
+                if (empty($val)) $rem_missing[] = $fk;
+            }
+        }
+
+        wp_send_json_success(array(
+            'message' => 'تم حفظ وتحديث بيانات الطالب بنجاح.',
+            'remaining_missing' => $rem_missing,
+            'student' => array(
+                'id' => $updated_stu->id,
+                'name' => $updated_stu->name,
+                'guardian_phone' => $updated_stu->guardian_phone,
+                'dob' => $updated_stu->dob,
+                'gender' => $updated_stu->gender,
+                'guardian_name' => $updated_stu->guardian_name,
+                'emirate' => $updated_stu->emirate,
+                'address' => $updated_stu->address,
+                'nationality' => $updated_stu->nationality,
+                'national_id' => $updated_stu->national_id
+            )
         ));
     }
 
@@ -14161,19 +14376,91 @@ class SM_Public {
     }
 
     public function ajax_save_exit_card_settings() {
-        check_ajax_referer('sm_admin_action', 'nonce');
-        if (!is_user_logged_in() || !current_user_can('manage_options')) {
+        if (!wp_verify_nonce($_POST['nonce'] ?? '', 'sm_admin_action') && !wp_verify_nonce($_POST['nonce'] ?? '', 'eess_admin_action')) {
+            wp_send_json_error('Security check failed');
+        }
+        if (!is_user_logged_in() || (!current_user_can('manage_options') && !current_user_can('إدارة_الطلاب'))) {
             wp_send_json_error('عفواً، لا تمتلك الصلاحية الكافية.');
         }
+
+        $portal_mode = sanitize_text_field($_POST['portal_mode'] ?? 'card_application');
+        if (!in_array($portal_mode, array('card_application', 'update_only'), true)) {
+            $portal_mode = 'card_application';
+        }
+
+        $raw_req_fields = $_POST['required_fields'] ?? array('guardian_phone', 'dob');
+        $required_fields = is_array($raw_req_fields) ? array_map('sanitize_text_field', $raw_req_fields) : array('guardian_phone', 'dob');
 
         $max_reqs = max(1, intval($_POST['max_requests'] ?? 3));
         $redirect = sanitize_text_field($_POST['redirect_discipline'] ?? 'yes');
 
         update_option('sm_exit_card_settings', array(
+            'portal_mode' => $portal_mode,
+            'required_fields' => $required_fields,
             'max_requests' => $max_reqs,
             'redirect_discipline' => $redirect
         ));
 
-        wp_send_json_success(array('message' => 'تم حفظ إعدادات ضوابط تصاريح الخروج بنجاح.'));
+        wp_send_json_success(array('message' => 'تم حفظ إعدادات البوابة وضوابط التحديث بنجاح.'));
+    }
+
+    public function ajax_manage_card_requests() {
+        if (!wp_verify_nonce($_REQUEST['nonce'] ?? '', 'sm_admin_action') && !wp_verify_nonce($_REQUEST['nonce'] ?? '', 'eess_admin_action')) {
+            wp_send_json_error('Security check failed');
+        }
+        if (!is_user_logged_in() || (!current_user_can('manage_options') && !current_user_can('إدارة_الطلاب'))) {
+            wp_send_json_error('عفواً، لا تمتلك الصلاحية الكافية.');
+        }
+
+        global $wpdb;
+        $action_type = sanitize_text_field($_REQUEST['action_type'] ?? 'list');
+
+        if ($action_type === 'list') {
+            $requests = $wpdb->get_results(
+                "SELECT r.*, s.name as student_name, s.student_code, s.class_name, s.section, s.photo_url
+                 FROM {$wpdb->prefix}sm_exit_card_requests r
+                 LEFT JOIN {$wpdb->prefix}sm_students s ON r.student_id = s.id
+                 ORDER BY r.id DESC LIMIT 50"
+            );
+
+            $formatted = array();
+            foreach ($requests as $r) {
+                $formatted[] = array(
+                    'id' => $r->id,
+                    'reference_no' => $r->reference_no ?: ('EXT-' . date('Y') . '-' . $r->id),
+                    'student_id' => $r->student_id,
+                    'student_name' => $r->student_name ?: 'غير مسجل',
+                    'student_code' => $r->student_code ?: ('STU-' . $r->student_id),
+                    'class_name' => $r->class_name ?: 'غير محدد',
+                    'section' => $r->section ?: '-',
+                    'photo_url' => $r->photo_url ?: '',
+                    'parent_name' => $r->parent_name,
+                    'parent_phone' => $r->parent_phone,
+                    'status' => $r->status,
+                    'status_label' => self::eess_get_exit_card_status_label($r->status),
+                    'created_at' => date_i18n('Y-m-d H:i', strtotime($r->created_at))
+                );
+            }
+            wp_send_json_success($formatted);
+
+        } elseif ($action_type === 'update_status') {
+            $req_id = intval($_POST['request_id'] ?? 0);
+            $new_status = sanitize_text_field($_POST['status'] ?? '');
+            if (!$req_id || empty($new_status)) {
+                wp_send_json_error('بيانات غير مكتملة.');
+            }
+
+            $wpdb->update("{$wpdb->prefix}sm_exit_card_requests", array('status' => $new_status), array('id' => $req_id));
+            wp_send_json_success(array('message' => 'تم تحديث حالة الطلب بنجاح.'));
+
+        } elseif ($action_type === 'delete') {
+            $req_id = intval($_POST['request_id'] ?? 0);
+            if (!$req_id) wp_send_json_error('معرف الطلب غير صحيح.');
+
+            $wpdb->delete("{$wpdb->prefix}sm_exit_card_requests", array('id' => $req_id));
+            wp_send_json_success(array('message' => 'تم حذف الطلب بنجاح.'));
+        }
+
+        wp_send_json_error('إجراء غير معروف.');
     }
 }

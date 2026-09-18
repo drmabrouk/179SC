@@ -225,8 +225,11 @@ class School_Management {
         $this->loader->add_action('wp_ajax_nopriv_sm_public_search_student', $plugin_public, 'ajax_public_search_student');
         $this->loader->add_action('wp_ajax_sm_public_verify_student', $plugin_public, 'ajax_public_verify_student');
         $this->loader->add_action('wp_ajax_nopriv_sm_public_verify_student', $plugin_public, 'ajax_public_verify_student');
+        $this->loader->add_action('wp_ajax_sm_public_update_student_missing_data', $plugin_public, 'ajax_public_update_student_missing_data');
+        $this->loader->add_action('wp_ajax_nopriv_sm_public_update_student_missing_data', $plugin_public, 'ajax_public_update_student_missing_data');
         $this->loader->add_action('wp_ajax_sm_public_submit_exit_card', $plugin_public, 'ajax_public_submit_exit_card');
         $this->loader->add_action('wp_ajax_nopriv_sm_public_submit_exit_card', $plugin_public, 'ajax_public_submit_exit_card');
+        $this->loader->add_action('wp_ajax_sm_manage_card_requests', $plugin_public, 'ajax_manage_card_requests');
 
         // Organizational Sub-Tab AJAX Actions
         $this->loader->add_action('wp_ajax_eess_save_subject', $plugin_public, 'ajax_eess_save_subject');
