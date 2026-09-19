@@ -14931,7 +14931,7 @@ class SM_Public {
         }
 
         $verify_method = sanitize_text_field($_POST['verify_method'] ?? 'both');
-        if (!in_array($verify_method, array('code', 'nat_id', 'both'), true)) {
+        if (!in_array($verify_method, array('code', 'nat_id', 'both', 'name_only'), true)) {
             $verify_method = 'both';
         }
 
@@ -14941,13 +14941,27 @@ class SM_Public {
         $max_reqs = max(1, intval($_POST['max_requests'] ?? 3));
         $redirect = sanitize_text_field($_POST['redirect_discipline'] ?? 'yes');
 
-        update_option('sm_exit_card_settings', array(
+        $service_update_data = sanitize_text_field($_POST['service_update_data'] ?? 'yes');
+        $service_exit_card   = sanitize_text_field($_POST['service_exit_card'] ?? 'yes');
+        $service_complaint   = sanitize_text_field($_POST['service_complaint'] ?? 'yes');
+        $service_sports      = sanitize_text_field($_POST['service_sports'] ?? 'yes');
+
+        $existing = get_option('sm_exit_card_settings', array());
+        if (!is_array($existing)) $existing = array();
+
+        $updated = array_merge($existing, array(
             'portal_mode' => $portal_mode,
             'verify_method' => $verify_method,
             'required_fields' => $required_fields,
             'max_requests' => $max_reqs,
-            'redirect_discipline' => $redirect
+            'redirect_discipline' => $redirect,
+            'service_update_data' => $service_update_data,
+            'service_exit_card' => $service_exit_card,
+            'service_complaint' => $service_complaint,
+            'service_sports' => $service_sports
         ));
+
+        update_option('sm_exit_card_settings', $updated);
 
         wp_send_json_success(array('message' => 'تم حفظ إعدادات البوابة وضوابط التحديث بنجاح.'));
     }
