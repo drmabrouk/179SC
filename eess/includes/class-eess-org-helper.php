@@ -1738,4 +1738,69 @@ class EESS_Org_Helper {
         self::ensure_divisions_table_exists();
         return $wpdb->delete("{$wpdb->prefix}eess_divisions", array('id' => $id));
     }
+
+    public static function calculate_lesson_prep_status($subject, $submit_timestamp = null) {
+        $tz = new DateTimeZone('Asia/Dubai');
+        if (!$submit_timestamp) {
+            $now_dt = new DateTime('now', $tz);
+            $submit_timestamp = $now_dt->getTimestamp();
+        } else {
+            $now_dt = new DateTime('@' . $submit_timestamp);
+            $now_dt->setTimezone($tz);
+        }
+
+        $prep_settings = get_option('sm_lesson_prep_settings', array(
+            'submission_deadline'  => '09:30',
+            'working_days'         => array('sun', 'mon', 'tue', 'wed', 'thu'),
+            'pe_monday_only'       => 'yes',
+            'subject_exceptions'   => 'التربية البدنية والصحية',
+        ));
+
+        $deadline_str = $prep_settings['submission_deadline'] ?? '09:30';
+        $deadline_parts = explode(':', $deadline_str);
+        $d_hour = intval($deadline_parts[0] ?? 9);
+        $d_min  = intval($deadline_parts[1] ?? 30);
+
+        $w_day = intval($now_dt->format('N')); // 1 (Mon) .. 7 (Sun)
+        $w_time = $now_dt->format('H:i:s');
+        $deadline_time_formatted = sprintf('%02d:%02d:00', $d_hour, $d_min);
+
+        $is_late = false;
+        if ($w_day == 1 && $w_time > $deadline_time_formatted) {
+            $is_late = true;
+        } elseif ($w_day >= 2 && $w_day <= 4) { // Tuesday, Wednesday, Thursday
+            $is_late = true;
+        }
+
+        // PE Exception rule
+        $is_pe = (mb_strpos(mb_strtolower($subject), 'رياضية') !== false || mb_strpos(mb_strtolower($subject), 'بدنية') !== false || mb_strpos(mb_strtolower($subject), 'pe') !== false || mb_strpos(mb_strtolower($subject), 'physical') !== false);
+        if ($is_pe && ($prep_settings['pe_monday_only'] ?? 'yes') === 'yes') {
+            if ($w_day == 1) {
+                $is_late = false;
+            }
+        }
+
+        if ($is_late) {
+            $monday_dt = clone $now_dt;
+            if ($w_day != 1) {
+                $monday_dt->modify('last Monday');
+            }
+            $monday_dt->setTime($d_hour, $d_min, 0);
+            $monday_deadline_ts = $monday_dt->getTimestamp();
+
+            $delay_seconds = max(1, $submit_timestamp - $monday_deadline_ts);
+            $status = 'late';
+        } else {
+            $delay_seconds = 0;
+            $status = 'submitted';
+        }
+
+        return array(
+            'status'           => $status,
+            'delay_seconds'    => $delay_seconds,
+            'is_late'          => $is_late,
+            'submit_timestamp' => $submit_timestamp,
+            'submission_time'  => $now_dt->format('Y-m-d H:i:s')
+        );
+    }
 }

@@ -236,6 +236,16 @@ class School_Management {
         $this->loader->add_action('wp_ajax_nopriv_sm_public_check_previous_request', $plugin_public, 'ajax_public_check_previous_request');
         $this->loader->add_action('wp_ajax_sm_manage_card_requests', $plugin_public, 'ajax_manage_card_requests');
 
+        $this->loader->add_action('wp_ajax_sm_public_submit_complaint', $plugin_public, 'ajax_public_submit_complaint');
+        $this->loader->add_action('wp_ajax_nopriv_sm_public_submit_complaint', $plugin_public, 'ajax_public_submit_complaint');
+        $this->loader->add_action('wp_ajax_sm_public_check_complaint_status', $plugin_public, 'ajax_public_check_complaint_status');
+        $this->loader->add_action('wp_ajax_nopriv_sm_public_check_complaint_status', $plugin_public, 'ajax_public_check_complaint_status');
+        $this->loader->add_action('wp_ajax_sm_manage_complaints', $plugin_public, 'ajax_manage_complaints');
+
+        $this->loader->add_action('wp_ajax_sm_public_submit_sports_registration', $plugin_public, 'ajax_public_submit_sports_registration');
+        $this->loader->add_action('wp_ajax_nopriv_sm_public_submit_sports_registration', $plugin_public, 'ajax_public_submit_sports_registration');
+        $this->loader->add_action('wp_ajax_sm_manage_sports_registrations', $plugin_public, 'ajax_manage_sports_registrations');
+
         // Organizational Sub-Tab AJAX Actions
         $this->loader->add_action('wp_ajax_eess_save_subject', $plugin_public, 'ajax_eess_save_subject');
         $this->loader->add_action('wp_ajax_eess_save_grade', $plugin_public, 'ajax_eess_save_grade');
