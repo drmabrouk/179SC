@@ -11219,6 +11219,86 @@ class SM_Public {
             </html>
             <?php
             exit;
+        } elseif ($print_type === 'complaint_doc') {
+            global $wpdb;
+            $cmp_id = intval($_GET['complaint_id'] ?? 0);
+            if (!$cmp_id) wp_die('معرف الشكوى غير مدخل.');
+
+            $cmp = $wpdb->get_row($wpdb->prepare(
+                "SELECT c.*, s.name as student_name, s.student_code, s.class_name, s.section, s.national_id, s.guardian_phone
+                 FROM {$wpdb->prefix}sm_complaints c
+                 JOIN {$wpdb->prefix}sm_students s ON c.student_id = s.id
+                 WHERE c.id = %d",
+                $cmp_id
+            ));
+
+            if (!$cmp) wp_die('سجل الشكوى غير موجود بالنظام.');
+
+            $school_info = SM_Settings::get_school_info();
+            $system_logo = !empty($school_info['school_logo']) ? $school_info['school_logo'] : (!empty($school_info['logo_url']) ? $school_info['logo_url'] : SM_PLUGIN_URL . 'assets/images/logo.png');
+            $ref_disp = $cmp->reference_no;
+            ?>
+            <!DOCTYPE html>
+            <html lang="ar" dir="rtl">
+            <head>
+                <meta charset="UTF-8">
+                <title>وثيقة رسمية - الشكاوى والاقتراحات</title>
+                <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+                <style>
+                    * { box-sizing: border-box; margin: 0; padding: 0; }
+                    body { font-family: 'Cairo', sans-serif; background: #ffffff; color: #0f172a; padding: 30px; direction: rtl; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                    .doc-card { max-width: 800px; margin: 0 auto; border: 2px solid #0f172a; border-radius: 16px; padding: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
+                    .hdr { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #881337; padding-bottom: 16px; margin-bottom: 24px; }
+                    .logo { width: 64px; height: 64px; object-fit: contain; }
+                    .grid-info { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: #f8fafc; border: 1px solid #cbd5e1; padding: 16px; border-radius: 12px; font-size: 13px; line-height: 1.8; margin-bottom: 20px; }
+                    .box-text { background: #ffffff; border: 1.5px solid #0f172a; border-radius: 12px; padding: 18px; font-size: 13.5px; line-height: 1.8; margin-bottom: 20px; white-space: pre-wrap; }
+                    @media print { body { padding: 0; } .no-print { display: none !important; } .doc-card { border: 1px solid #0f172a; box-shadow: none; } }
+                </style>
+            </head>
+            <body>
+                <div class="no-print" style="text-align: center; margin-bottom: 20px;">
+                    <button onclick="window.print()" style="background: #881337; color: white; border: none; padding: 10px 28px; border-radius: 8px; font-weight: 800; cursor: pointer; font-size: 14px;">🖨️ طباعة الوثيقة الرسمية (A4)</button>
+                </div>
+                <div class="doc-card">
+                    <div class="hdr">
+                        <div>
+                            <h2 style="font-size: 20px; font-weight: 900; color: #0f172a;">مؤسسة الشعلة للتعليم والتطوير</h2>
+                            <div style="font-size: 13px; color: #881337; font-weight: 800;">وثيقة متابعة شكوى إلكترونية رسمية</div>
+                        </div>
+                        <img src="<?php echo esc_url($system_logo); ?>" class="logo" alt="Logo">
+                    </div>
+
+                    <div class="grid-info">
+                        <div><strong>الرقم المرجعي:</strong> <span style="font-family: monospace; font-weight: 900; color: #881337;"><?php echo esc_html($ref_disp); ?></span></div>
+                        <div><strong>تاريخ التقديم:</strong> <?php echo date_i18n('Y-m-d H:i', strtotime($cmp->created_at)); ?></div>
+                        <div><strong>اسم الطالب:</strong> <strong><?php echo esc_html($cmp->student_name); ?></strong></div>
+                        <div><strong>الكود والصف:</strong> <?php echo esc_html($cmp->student_code); ?> | <?php echo esc_html($cmp->class_name); ?> (<?php echo esc_html($cmp->section); ?>)</div>
+                        <div><strong>الهوية الوطنية:</strong> <?php echo esc_html($cmp->national_id ?: 'غير مدخلة'); ?></div>
+                        <div><strong>هاتف التواصل:</strong> <?php echo esc_html($cmp->guardian_phone ?: 'غير مدخل'); ?></div>
+                    </div>
+
+                    <div style="font-weight: 900; font-size: 15px; color: #0f172a; margin-bottom: 8px;">عنوان الشكوى: <?php echo esc_html($cmp->title); ?></div>
+                    <div class="box-text">
+                        <strong>تفاصيل الشكوى المسجلة:</strong><br>
+                        <?php echo esc_html($cmp->details); ?>
+                    </div>
+
+                    <?php if (!empty($cmp->admin_notes)): ?>
+                        <div style="background: #fffbe3; border: 1px solid #fde047; border-radius: 12px; padding: 14px; font-size: 12.5px; color: #854d0e; line-height: 1.6; margin-bottom: 20px;">
+                            <strong>توصيات وملاحظات الإدارة:</strong><br>
+                            <?php echo esc_html($cmp->admin_notes); ?>
+                        </div>
+                    <?php endif; ?>
+
+                    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 40px; font-size: 12px; font-weight: 800; color: #334155;">
+                        <div>توقيع مقدم الشكوى: .......................</div>
+                        <div style="text-align: center;">اعتماد إدارة المدرسة والتختيم الرسمية<br><br>....................................................</div>
+                    </div>
+                </div>
+            </body>
+            </html>
+            <?php
+            exit;
         } elseif ($print_type === 'teacher_card' || $print_type === 'teacher_id_card') {
             $emp_ids = array();
             if (!empty($_GET['employee_id'])) {
@@ -13063,27 +13143,11 @@ class SM_Public {
         $supervisors = get_users(array('role__in' => array('sm_supervisor', 'sm_principal', 'administrator')));
         $supervisor_id = !empty($supervisors) ? $supervisors[0]->ID : 1;
 
-        // Calculate Late Submission Status & Delay Seconds against authoritative deadline
-        $prep_settings = get_option('sm_lesson_prep_settings', array('deadline_time' => '12:00'));
-        $deadline_time = $prep_settings['deadline_time'] ?? '12:00';
-        if (strlen($deadline_time) == 5) $deadline_time .= ':00';
-
-        $tz = wp_timezone();
-        $now_dt = new DateTime('now', $tz);
-        $deadline_dt = new DateTime($lesson_date . ' ' . $deadline_time, $tz);
-
-        $delay_seconds = 0;
-        $status = 'submitted';
-
-        // Exemption check for Physical Education
-        $is_pe = (strpos(strtolower($subject), 'رياضية') !== false || strpos(strtolower($subject), 'بدنية') !== false || strpos(strtolower($subject), 'pe') !== false || strpos(strtolower($subject), 'physical') !== false);
-        $is_monday = (date('N', strtotime($lesson_date)) == 1);
-        $exempt = ($is_pe && ($prep_settings['pe_monday_only'] ?? 'yes') === 'yes' && !$is_monday);
-
-        if ($now_dt > $deadline_dt && !$exempt) {
-            $delay_seconds = $now_dt->getTimestamp() - $deadline_dt->getTimestamp();
-            $status = 'late';
-        }
+        // Calculate Late Submission Status & Delay Seconds using authoritative EESS_Org_Helper deadline calculator
+        $calc_res      = EESS_Org_Helper::calculate_lesson_prep_status($subject);
+        $status        = $calc_res['status'];
+        $delay_seconds = $calc_res['delay_seconds'];
+        $sub_time      = $calc_res['submission_time'];
 
         global $wpdb;
         $inserted = $wpdb->insert(
@@ -13096,7 +13160,7 @@ class SM_Public {
                 'grade_level'     => $grade_level,
                 'class_section'   => $class_section,
                 'lesson_date'     => $lesson_date,
-                'submission_time' => current_time('mysql'),
+                'submission_time' => $sub_time,
                 'status'          => $status,
                 'delay_seconds'   => $delay_seconds,
                 'lesson_data'     => json_encode($lesson_data),
@@ -15069,6 +15133,278 @@ class SM_Public {
             // Delete ONLY the request record from sm_exit_card_requests (preserving student record)
             $wpdb->delete("{$wpdb->prefix}sm_exit_card_requests", array('id' => $req_id));
             wp_send_json_success(array('message' => 'تم حذف طلب تصريح الخروج بنجاح مع الحفاظ على سجل الطالب.'));
+        }
+
+        wp_send_json_error('إجراء غير معروف.');
+    }
+
+    public function ajax_public_submit_complaint() {
+        SM_DB::ensure_portal_tables_exist();
+
+        $student_id = intval($_POST['student_id'] ?? 0);
+        $title      = sanitize_text_field($_POST['title'] ?? '');
+        $details    = sanitize_textarea_field($_POST['details'] ?? '');
+
+        if (!$student_id) wp_send_json_error('يرجى تحديد الطالب المعني بالشكوى.');
+        if (empty($title)) wp_send_json_error('يرجى كتابة عنوان الشكوى.');
+        if (empty($details)) wp_send_json_error('يرجى كتابة تفاصيل الشكوى.');
+
+        if (mb_strlen($details) > 1000) {
+            $details = mb_substr($details, 0, 1000);
+        }
+
+        $student = SM_DB::get_student_by_id($student_id);
+        if (!$student) wp_send_json_error('سجل الطالب غير موجود.');
+
+        global $wpdb;
+        $ref_no = 'CMP-' . date('Y') . '-' . rand(10000, 99999);
+
+        $inserted = $wpdb->insert("{$wpdb->prefix}sm_complaints", array(
+            'reference_no' => $ref_no,
+            'student_id'   => $student_id,
+            'title'        => $title,
+            'details'      => $details,
+            'status'       => 'submitted',
+            'created_at'   => current_time('mysql')
+        ));
+
+        if ($inserted) {
+            $cmp_id = $wpdb->insert_id;
+            SM_Logger::log('تقديم شكوى', "تم تسجيل شكوى جديدة برقم: $ref_no للطالب: {$student->name}");
+            wp_send_json_success(array(
+                'complaint_id' => $cmp_id,
+                'reference_no' => $ref_no,
+                'message'      => 'تم تسجيل وتسليم الشكوى بنجاح وهي الآن قيد المتابعة الإدارية.'
+            ));
+        } else {
+            wp_send_json_error('فشل حفظ الشكوى بالنظام.');
+        }
+    }
+
+    public function ajax_public_check_complaint_status() {
+        SM_DB::ensure_portal_tables_exist();
+        $query = sanitize_text_field($_POST['search_query'] ?? '');
+        if (empty($query)) {
+            wp_send_json_error('يرجى إدخال رقم الهوية الوطنية أو كود الطالب أو الرقم المرجعي للشكوى.');
+        }
+
+        global $wpdb;
+        $clean_q = trim($query);
+
+        $cmp = $wpdb->get_row($wpdb->prepare(
+            "SELECT c.*, s.name as student_name, s.student_code, s.class_name, s.section, s.national_id
+             FROM {$wpdb->prefix}sm_complaints c
+             JOIN {$wpdb->prefix}sm_students s ON c.student_id = s.id
+             WHERE c.reference_no = %s OR s.national_id = %s OR s.student_code = %s OR c.id = %d
+             ORDER BY c.id DESC LIMIT 1",
+            $clean_q, $clean_q, $clean_q, intval($clean_q)
+        ));
+
+        if (!$cmp) {
+            wp_send_json_error('لم يتم العثور على شكوى مسجلة تطابق البيانات المدخلة.');
+        }
+
+        $name_parts = explode(' ', trim($cmp->student_name));
+        $first_name = $name_parts[0] ?? '';
+        $last_name  = end($name_parts);
+        $display_stu_name = $first_name . ' ' . ($last_name && $last_name !== $first_name ? $last_name : '');
+
+        $status_labels = array(
+            'submitted'    => 'تم تقديم الشكوى',
+            'under_review' => 'قيد الدراسة والتدقيق الإداري',
+            'resolved'     => 'تمت معالجة الشكوى بنجاح',
+            'rejected'     => 'تم حفظ الشكوى / غير مستوفية'
+        );
+
+        wp_send_json_success(array(
+            'id'           => $cmp->id,
+            'reference_no' => $cmp->reference_no,
+            'student_name' => $display_stu_name,
+            'title'        => $cmp->title,
+            'details'      => $cmp->details,
+            'status'       => $cmp->status,
+            'status_label' => $status_labels[$cmp->status] ?? 'قيد المتابعة',
+            'admin_notes'  => $cmp->admin_notes ?: 'لا توجد ملاحظات إدارية إضافية حتى الآن.',
+            'created_at'   => date_i18n('Y-m-d H:i', strtotime($cmp->created_at))
+        ));
+    }
+
+    public function ajax_manage_complaints() {
+        if (!wp_verify_nonce($_REQUEST['nonce'] ?? '', 'sm_admin_action') && !wp_verify_nonce($_REQUEST['nonce'] ?? '', 'eess_admin_action')) {
+            wp_send_json_error('Security check failed');
+        }
+        if (!self::is_card_admin()) {
+            wp_send_json_error('عفواً، لا تمتلك الصلاحية الكافية.');
+        }
+
+        SM_DB::ensure_portal_tables_exist();
+        global $wpdb;
+        $action_type = sanitize_text_field($_REQUEST['action_type'] ?? 'list');
+
+        if ($action_type === 'list') {
+            $complaints = $wpdb->get_results(
+                "SELECT c.*, s.name as student_name, s.student_code, s.class_name, s.section, s.guardian_phone
+                 FROM {$wpdb->prefix}sm_complaints c
+                 LEFT JOIN {$wpdb->prefix}sm_students s ON c.student_id = s.id
+                 ORDER BY c.id DESC LIMIT 50"
+            );
+
+            $formatted = array();
+            $status_labels = array(
+                'submitted'    => 'تم تقديم الشكوى',
+                'under_review' => 'قيد الدراسة والتدقيق',
+                'resolved'     => 'تمت المعالجة بنجاح',
+                'rejected'     => 'تم الحفظ / الرفض'
+            );
+
+            foreach ($complaints as $c) {
+                $formatted[] = array(
+                    'id'           => $c->id,
+                    'reference_no' => $c->reference_no,
+                    'student_id'   => $c->student_id,
+                    'student_name' => $c->student_name ?: 'غير مسجل',
+                    'student_code' => $c->student_code ?: '-',
+                    'class_name'   => $c->class_name ?: '-',
+                    'section'      => $c->section ?: '-',
+                    'phone'        => $c->guardian_phone ?: '',
+                    'title'        => $c->title,
+                    'details'      => $c->details,
+                    'status'       => $c->status,
+                    'status_label' => $status_labels[$c->status] ?? 'قيد المعالجة',
+                    'admin_notes'  => $c->admin_notes ?: '',
+                    'created_at'   => date_i18n('Y-m-d H:i', strtotime($c->created_at))
+                );
+            }
+            wp_send_json_success($formatted);
+
+        } elseif ($action_type === 'update_status') {
+            $cmp_id = intval($_POST['complaint_id'] ?? 0);
+            $new_status = sanitize_text_field($_POST['status'] ?? '');
+            $admin_notes = sanitize_textarea_field($_POST['admin_notes'] ?? '');
+
+            if (!$cmp_id || empty($new_status)) {
+                wp_send_json_error('بيانات غير مكتملة.');
+            }
+
+            $wpdb->update("{$wpdb->prefix}sm_complaints", array(
+                'status' => $new_status,
+                'admin_notes' => $admin_notes
+            ), array('id' => $cmp_id));
+
+            wp_send_json_success(array('message' => 'تم تحديث حالة الشكوى والملاحظات بنجاح.'));
+
+        } elseif ($action_type === 'delete') {
+            $cmp_id = intval($_POST['complaint_id'] ?? 0);
+            if (!$cmp_id) wp_send_json_error('معرف الشكوى غير صحيح.');
+
+            $wpdb->delete("{$wpdb->prefix}sm_complaints", array('id' => $cmp_id));
+            wp_send_json_success(array('message' => 'تم حذف سجل الشكوى بنجاح.'));
+        }
+
+        wp_send_json_error('إجراء غير معروف.');
+    }
+
+    public function ajax_public_submit_sports_registration() {
+        SM_DB::ensure_portal_tables_exist();
+
+        $student_id = intval($_POST['student_id'] ?? 0);
+        $raw_sports = $_POST['sports'] ?? array();
+        $sports     = is_array($raw_sports) ? array_map('sanitize_text_field', $raw_sports) : array();
+
+        if (!$student_id) wp_send_json_error('يرجى تحديد الطالب التسجيل بالأنشطة الرياضية.');
+        if (empty($sports)) wp_send_json_error('يرجى اختيار نشاط رياضي واحد على الأقل.');
+
+        if (count($sports) > 2) {
+            wp_send_json_error('تنبيه: يمكن لكل طالب التقديم في نشاطين رياضيين بحد أقصى.');
+        }
+
+        $student = SM_DB::get_student_by_id($student_id);
+        if (!$student) wp_send_json_error('سجل الطالب غير موجود.');
+
+        global $wpdb;
+        $acad_year = '2026/2027';
+
+        $existing_id = $wpdb->get_var($wpdb->prepare(
+            "SELECT id FROM {$wpdb->prefix}sm_sports_registrations WHERE student_id = %d AND academic_year = %s",
+            $student_id, $acad_year
+        ));
+
+        $sports_json = json_encode($sports, JSON_UNESCAPED_UNICODE);
+
+        if ($existing_id) {
+            $wpdb->update("{$wpdb->prefix}sm_sports_registrations", array(
+                'selected_sports' => $sports_json,
+                'status' => 'registered'
+            ), array('id' => $existing_id));
+        } else {
+            $wpdb->insert("{$wpdb->prefix}sm_sports_registrations", array(
+                'student_id'      => $student_id,
+                'academic_year'   => $acad_year,
+                'selected_sports' => $sports_json,
+                'status'          => 'registered',
+                'created_at'      => current_time('mysql')
+            ));
+        }
+
+        SM_Logger::log('تسجيل أنشطة رياضية', "تم تسجيل/تحديث الأنشطة الرياضية للطالب: {$student->name} (" . implode(', ', $sports) . ")");
+        wp_send_json_success(array('message' => 'تم تسجيل رغبات الطالب بالأنشطة الرياضية بنجاح.'));
+    }
+
+    public function ajax_manage_sports_registrations() {
+        if (!wp_verify_nonce($_REQUEST['nonce'] ?? '', 'sm_admin_action') && !wp_verify_nonce($_REQUEST['nonce'] ?? '', 'eess_admin_action')) {
+            wp_send_json_error('Security check failed');
+        }
+        if (!self::is_card_admin()) {
+            wp_send_json_error('عفواً، لا تمتلك الصلاحية الكافية.');
+        }
+
+        SM_DB::ensure_portal_tables_exist();
+        global $wpdb;
+        $action_type = sanitize_text_field($_REQUEST['action_type'] ?? 'list');
+
+        if ($action_type === 'list') {
+            $regs = $wpdb->get_results(
+                "SELECT r.*, s.name as student_name, s.student_code, s.class_name, s.section
+                 FROM {$wpdb->prefix}sm_sports_registrations r
+                 LEFT JOIN {$wpdb->prefix}sm_students s ON r.student_id = s.id
+                 ORDER BY r.id DESC LIMIT 100"
+            );
+
+            $formatted = array();
+            foreach ($regs as $r) {
+                $sports = json_decode($r->selected_sports, true) ?: array();
+                $formatted[] = array(
+                    'id'           => $r->id,
+                    'student_id'   => $r->student_id,
+                    'student_name' => $r->student_name ?: 'غير مسجل',
+                    'student_code' => $r->student_code ?: '-',
+                    'class_name'   => $r->class_name ?: '-',
+                    'section'      => $r->section ?: '-',
+                    'sports'       => $sports,
+                    'sports_label' => implode(' + ', $sports),
+                    'status'       => $r->status,
+                    'created_at'   => date_i18n('Y-m-d H:i', strtotime($r->created_at))
+                );
+            }
+            wp_send_json_success($formatted);
+
+        } elseif ($action_type === 'update_status') {
+            $reg_id = intval($_POST['registration_id'] ?? 0);
+            $new_status = sanitize_text_field($_POST['status'] ?? '');
+
+            if (!$reg_id || empty($new_status)) {
+                wp_send_json_error('بيانات غير مكتملة.');
+            }
+
+            $wpdb->update("{$wpdb->prefix}sm_sports_registrations", array('status' => $new_status), array('id' => $reg_id));
+            wp_send_json_success(array('message' => 'تم تحديث حالة التسجيل بنجاح.'));
+
+        } elseif ($action_type === 'delete') {
+            $reg_id = intval($_POST['registration_id'] ?? 0);
+            if (!$reg_id) wp_send_json_error('معرف التسجيل غير صحيح.');
+
+            $wpdb->delete("{$wpdb->prefix}sm_sports_registrations", array('id' => $reg_id));
+            wp_send_json_success(array('message' => 'تم حذف طلب التسجيل بالنشاط الرياضي بنجاح.'));
         }
 
         wp_send_json_error('إجراء غير معروف.');

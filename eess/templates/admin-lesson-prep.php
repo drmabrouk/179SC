@@ -122,40 +122,10 @@ if (isset($_POST['eess_save_lesson_prep']) && wp_verify_nonce($_POST['eess_lesso
 
     if ($status === 'submitted') {
         // Authoritative server timestamp (Asia/Dubai timezone configured for WordPress)
-        $submit_timestamp = current_time('timestamp');
-        $submission_time  = date('Y-m-d H:i:s', $submit_timestamp);
-
-        // Determine weekly deadline on the server:
-        // Weekly Cycle: Friday 00:00:00 -> Monday 09:30:00 deadline.
-        // Submissions between Monday 09:30:01 and Thursday 23:59:59 are marked late.
-        $w_day = intval(date('N', $submit_timestamp)); // 1 (Mon) .. 7 (Sun)
-        $w_time = date('H:i:s', $submit_timestamp);
-
-        $is_late = false;
-        if ($w_day == 1 && $w_time > '09:30:00') {
-            $is_late = true;
-        } elseif ($w_day >= 2 && $w_day <= 4) { // Tuesday, Wednesday, Thursday
-            $is_late = true;
-        }
-
-        // Exemption check for PE (English/Arabic matching)
-        $is_pe = (strpos(strtolower($subject), 'رياضية') !== false || strpos(strtolower($subject), 'بدنية') !== false || strpos(strtolower($subject), 'pe') !== false || strpos(strtolower($subject), 'physical') !== false);
-        if ($is_pe && ($prep_settings['pe_monday_only'] ?? 'yes') === 'yes' && $w_day != 1) {
-            $is_late = false;
-        }
-
-        if ($is_late) {
-            // Calculate delay relative to Monday 9:30 AM deadline of current week
-            $monday_deadline_ts = strtotime('this Monday 09:30:00', $submit_timestamp);
-            if ($monday_deadline_ts > $submit_timestamp) {
-                $monday_deadline_ts = strtotime('last Monday 09:30:00', $submit_timestamp);
-            }
-            $delay_seconds = max(1, $submit_timestamp - $monday_deadline_ts);
-            $final_status  = 'late';
-        } else {
-            $delay_seconds = 0;
-            $final_status  = 'submitted';
-        }
+        $calc_res        = EESS_Org_Helper::calculate_lesson_prep_status($subject);
+        $submission_time = $calc_res['submission_time'];
+        $final_status    = $calc_res['status'];
+        $delay_seconds   = $calc_res['delay_seconds'];
     }
 
     $supervisor_id = eess_get_teacher_supervisor($user_id);
@@ -388,11 +358,22 @@ $unique_subjects = array_unique(array_map(function($s){ return $s->name; }, $all
 
         if (!empty($prep_teacher_ids)) {
             $prep_placeholders = implode(',', array_fill(0, count($prep_teacher_ids), '%d'));
-            $stats_submitted = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}sm_lesson_preps WHERE teacher_id IN ($prep_placeholders) AND status IN ('submitted', 'approved', 'resubmitted', 'late')", ...$prep_teacher_ids));
-            $stats_approved  = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}sm_lesson_preps WHERE teacher_id IN ($prep_placeholders) AND status = 'approved'", ...$prep_teacher_ids));
-            $stats_revision  = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}sm_lesson_preps WHERE teacher_id IN ($prep_placeholders) AND status = 'revision_required'", ...$prep_teacher_ids));
-            $stats_rejected  = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}sm_lesson_preps WHERE teacher_id IN ($prep_placeholders) AND status = 'rejected'", ...$prep_teacher_ids));
-            $stats_late      = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}sm_lesson_preps WHERE teacher_id IN ($prep_placeholders) AND status = 'late'", ...$prep_teacher_ids));
+            $stats_row = $wpdb->get_row($wpdb->prepare("
+                SELECT
+                    SUM(CASE WHEN status IN ('submitted', 'approved', 'resubmitted', 'late') THEN 1 ELSE 0 END) as cnt_submitted,
+                    SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) as cnt_approved,
+                    SUM(CASE WHEN status = 'revision_required' THEN 1 ELSE 0 END) as cnt_revision,
+                    SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as cnt_rejected,
+                    SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as cnt_late
+                FROM {$wpdb->prefix}sm_lesson_preps
+                WHERE teacher_id IN ($prep_placeholders)
+            ", ...$prep_teacher_ids));
+
+            $stats_submitted = intval($stats_row->cnt_submitted ?? 0);
+            $stats_approved  = intval($stats_row->cnt_approved ?? 0);
+            $stats_revision  = intval($stats_row->cnt_revision ?? 0);
+            $stats_rejected  = intval($stats_row->cnt_rejected ?? 0);
+            $stats_late      = intval($stats_row->cnt_late ?? 0);
         } else {
             $stats_submitted = 0;
             $stats_approved  = 0;
@@ -2161,19 +2142,23 @@ function eessGoToPrepStage(stageNum) {
 const eessSubmissions = <?php
     $preps_for_js = array();
     if (!empty($submissions)) {
+        $prep_ids = array_map(function($s) { return $s->id; }, $submissions);
+        $comments_map = array();
+        if (!empty($prep_ids)) {
+            $p_placeholders = implode(',', array_fill(0, count($prep_ids), '%d'));
+            $all_comments = $wpdb->get_results($wpdb->prepare("SELECT c.*, u.display_name FROM {$wpdb->prefix}sm_lesson_comments c JOIN {$wpdb->users} u ON c.user_id = u.ID WHERE c.prep_id IN ($p_placeholders) ORDER BY c.created_at ASC", ...$prep_ids));
+            foreach ($all_comments as $com) {
+                $comments_map[$com->prep_id][] = array(
+                    'author' => $com->display_name,
+                    'text'   => $com->comment_text,
+                    'date'   => date_i18n('Y-m-d H:i', strtotime($com->created_at))
+                );
+            }
+        }
+
         foreach ($submissions as $sub) {
             $parsed_data = json_decode($sub->lesson_data, true) ?: array();
-            $comments = $wpdb->get_results($wpdb->prepare("SELECT c.*, u.display_name FROM {$wpdb->prefix}sm_lesson_comments c JOIN {$wpdb->prefix}users u ON c.user_id = u.ID WHERE c.prep_id = %d ORDER BY c.created_at ASC", $sub->id));
-            $comments_array = array();
-            if (!empty($comments)) {
-                foreach ($comments as $com) {
-                    $comments_array[] = array(
-                        'author' => $com->display_name,
-                        'text' => $com->comment_text,
-                        'date' => date_i18n('Y-m-d H:i', strtotime($com->created_at))
-                    );
-                }
-            }
+            $comments_array = $comments_map[$sub->id] ?? array();
 
             $preps_for_js[$sub->id] = array(
                 'title' => $sub->title,

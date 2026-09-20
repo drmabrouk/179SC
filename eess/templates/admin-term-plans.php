@@ -145,10 +145,20 @@ $arabic_term_names = array(
 
             if (!empty($target_teacher_ids)) {
                 $id_placeholders = implode(',', array_fill(0, count($target_teacher_ids), '%d'));
-                $plan_stats_submitted = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}sm_term_plans WHERE teacher_id IN ($id_placeholders) AND status IN ('submitted', 'approved', 'returned', 'rejected')", ...$target_teacher_ids));
-                $plan_stats_approved  = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}sm_term_plans WHERE teacher_id IN ($id_placeholders) AND status = 'approved'", ...$target_teacher_ids));
-                $plan_stats_returned  = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}sm_term_plans WHERE teacher_id IN ($id_placeholders) AND status = 'returned'", ...$target_teacher_ids));
-                $plan_stats_rejected  = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}sm_term_plans WHERE teacher_id IN ($id_placeholders) AND status = 'rejected'", ...$target_teacher_ids));
+                $plan_stats_row = $wpdb->get_row($wpdb->prepare("
+                    SELECT
+                        SUM(CASE WHEN status IN ('submitted', 'approved', 'returned', 'rejected') THEN 1 ELSE 0 END) as cnt_submitted,
+                        SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) as cnt_approved,
+                        SUM(CASE WHEN status = 'returned' THEN 1 ELSE 0 END) as cnt_returned,
+                        SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as cnt_rejected
+                    FROM {$wpdb->prefix}sm_term_plans
+                    WHERE teacher_id IN ($id_placeholders)
+                ", ...$target_teacher_ids));
+
+                $plan_stats_submitted = intval($plan_stats_row->cnt_submitted ?? 0);
+                $plan_stats_approved  = intval($plan_stats_row->cnt_approved ?? 0);
+                $plan_stats_returned  = intval($plan_stats_row->cnt_returned ?? 0);
+                $plan_stats_rejected  = intval($plan_stats_row->cnt_rejected ?? 0);
             } else {
                 $plan_stats_submitted = 0;
                 $plan_stats_approved  = 0;
