@@ -10926,11 +10926,11 @@ class SM_Public {
                     .card-field-val { color: #0f172a; font-weight: 900; white-space: nowrap; }
 
                     /* Barcode Stack Aligned Left Above Bottom Strip */
-                    .card-qr-stack { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; width: 32mm; flex-shrink: 0; text-align: center; margin-top: auto; }
-                    .card-qr-box { width: 32mm; height: 15mm; border: none; border-radius: 0; padding: 0; background: transparent; box-shadow: none; }
+                    .card-qr-stack { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; width: 33mm; flex-shrink: 0; text-align: center; margin-top: auto; }
+                    .card-qr-box { width: 33mm; height: 16.5mm; border: none; border-radius: 0; padding: 0; background: transparent; box-shadow: none; margin-top: 3px; }
                     .card-qr-box svg { width: 100%; height: 100%; display: block; }
                     .card-qr-box svg rect:first-child { fill: transparent !important; }
-                    .card-barcode-code-label { font-size: 7px; font-weight: 900; color: #0f172a; font-family: monospace, sans-serif; letter-spacing: 1.5px; text-align: center; width: 100%; margin-top: 1px; display: block; white-space: nowrap; }
+                    .card-barcode-code-label { font-size: 7px; font-weight: 900; color: #0f172a; font-family: monospace, sans-serif; letter-spacing: 1.5px; text-align: center; width: 100%; margin-top: -1px; display: block; white-space: nowrap; }
                     .card-serial-text { display: none !important; }
 
                     /* Footer Area */
@@ -12676,6 +12676,15 @@ class SM_Public {
             $formatted_dt = date('Y-m-d H:i:s', strtotime($raw_dt));
             $update_data['submission_time'] = $formatted_dt;
             $update_data['created_at'] = $formatted_dt;
+        }
+
+        if ($status !== 'late') {
+            $update_data['delay_seconds'] = 0;
+        } else {
+            $subj = $wpdb->get_var($wpdb->prepare("SELECT subject FROM {$wpdb->prefix}sm_lesson_preps WHERE id = %d", $prep_id));
+            $sub_ts = !empty($raw_dt) ? strtotime($raw_dt) : time();
+            $calc = EESS_Org_Helper::calculate_lesson_prep_status($subj, $sub_ts);
+            $update_data['delay_seconds'] = $calc['delay_seconds'];
         }
 
         $updated = $wpdb->update("{$wpdb->prefix}sm_lesson_preps", $update_data, array('id' => $prep_id));
@@ -14597,6 +14606,11 @@ class SM_Public {
     }
 
     public function ajax_public_update_student_missing_data() {
+        $settings = get_option('sm_exit_card_settings', array());
+        if (($settings['service_update_data'] ?? 'yes') === 'no') {
+            wp_send_json_error('خدمة تحديث بيانات الطالب غير متاحة حالياً بالنظام.');
+        }
+
         $student_id  = intval($_POST['student_id'] ?? 0);
         $verify_code = sanitize_text_field($_POST['verify_code'] ?? '');
 
@@ -14731,6 +14745,11 @@ class SM_Public {
     }
 
     public function ajax_public_submit_exit_card() {
+        $settings = get_option('sm_exit_card_settings', array());
+        if (($settings['service_exit_card'] ?? 'yes') === 'no') {
+            wp_send_json_error('خدمة طلب بطاقات تصاريح الخروج غير متاحة حالياً بالنظام.');
+        }
+
         $student_id = intval($_POST['student_id'] ?? 0);
         $verify_code = sanitize_text_field($_POST['verify_code'] ?? '');
         $parent_name = sanitize_text_field($_POST['parent_name'] ?? '');
@@ -15005,10 +15024,10 @@ class SM_Public {
         $max_reqs = max(1, intval($_POST['max_requests'] ?? 3));
         $redirect = sanitize_text_field($_POST['redirect_discipline'] ?? 'yes');
 
-        $service_update_data = sanitize_text_field($_POST['service_update_data'] ?? 'yes');
-        $service_exit_card   = sanitize_text_field($_POST['service_exit_card'] ?? 'yes');
-        $service_complaint   = sanitize_text_field($_POST['service_complaint'] ?? 'yes');
-        $service_sports      = sanitize_text_field($_POST['service_sports'] ?? 'yes');
+        $service_update_data = isset($_POST['service_update_data']) ? sanitize_text_field($_POST['service_update_data']) : 'no';
+        $service_exit_card   = isset($_POST['service_exit_card']) ? sanitize_text_field($_POST['service_exit_card']) : 'no';
+        $service_complaint   = isset($_POST['service_complaint']) ? sanitize_text_field($_POST['service_complaint']) : 'no';
+        $service_sports      = isset($_POST['service_sports']) ? sanitize_text_field($_POST['service_sports']) : 'no';
 
         $existing = get_option('sm_exit_card_settings', array());
         if (!is_array($existing)) $existing = array();
@@ -15140,6 +15159,11 @@ class SM_Public {
 
     public function ajax_public_submit_complaint() {
         SM_DB::ensure_portal_tables_exist();
+
+        $settings = get_option('sm_exit_card_settings', array());
+        if (($settings['service_complaint'] ?? 'yes') === 'no') {
+            wp_send_json_error('خدمة تقديم الشكاوى والاقتراحات غير متاحة حالياً بالنظام.');
+        }
 
         $student_id = intval($_POST['student_id'] ?? 0);
         $title      = sanitize_text_field($_POST['title'] ?? '');
@@ -15306,6 +15330,11 @@ class SM_Public {
 
     public function ajax_public_submit_sports_registration() {
         SM_DB::ensure_portal_tables_exist();
+
+        $settings = get_option('sm_exit_card_settings', array());
+        if (($settings['service_sports'] ?? 'yes') === 'no') {
+            wp_send_json_error('خدمة التسجيل بالأنشطة الرياضية غير متاحة حالياً بالنظام.');
+        }
 
         $student_id = intval($_POST['student_id'] ?? 0);
         $raw_sports = $_POST['sports'] ?? array();

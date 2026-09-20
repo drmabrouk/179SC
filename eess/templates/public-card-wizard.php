@@ -75,15 +75,21 @@ $service_sports       = $card_settings['service_sports'] ?? 'yes';
 }
 .eess-service-cards-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 16px;
     margin-bottom: 24px;
+}
+@media (max-width: 1023px) and (min-width: 601px) {
+    .eess-service-cards-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 600px) {
+    .eess-service-cards-grid { grid-template-columns: repeat(2, 1fr); }
 }
 .eess-service-card {
     background: #f8fafc;
     border: 2px solid #cbd5e1;
     border-radius: 16px;
-    padding: 20px 16px;
+    padding: 18px 12px;
     text-align: center;
     cursor: pointer;
     transition: all 0.25s ease;
@@ -92,6 +98,8 @@ $service_sports       = $card_settings['service_sports'] ?? 'yes';
     align-items: center;
     justify-content: center;
     gap: 10px;
+    height: 100%;
+    box-sizing: border-box;
 }
 .eess-service-card:hover {
     border-color: #881337;
@@ -706,12 +714,75 @@ function eessShowToast(message, type) {
     setTimeout(() => toast.style.display = 'none', 3500);
 }
 
+function wResetPortalForms() {
+    wSelectedStudent = null;
+    wVerifiedData = null;
+
+    const stuInp = document.getElementById('w_student_name_input');
+    if (stuInp) stuInp.value = '';
+
+    const verInp = document.getElementById('w_verify_code_input');
+    if (verInp) verInp.value = '';
+
+    const cmpTitle = document.getElementById('w_cmp_title_input');
+    if (cmpTitle) cmpTitle.value = '';
+
+    const cmpDetails = document.getElementById('w_cmp_details_input');
+    if (cmpDetails) cmpDetails.value = '';
+
+    const photoInp = document.getElementById('w_student_photo_file');
+    if (photoInp) photoInp.value = '';
+
+    const parentName = document.getElementById('w_parent_name');
+    if (parentName) parentName.value = '';
+
+    const parentPhone = document.getElementById('w_parent_phone');
+    if (parentPhone) parentPhone.value = '';
+
+    document.querySelectorAll('input[name="sports_activity[]"]').forEach(c => c.checked = false);
+    const declChk = document.getElementById('w_declaration_chk');
+    if (declChk) declChk.checked = false;
+
+    if (typeof wClearSignature === 'function') wClearSignature();
+
+    const hideIds = [
+        'w-selected-stu-box', 'w-search-suggestions', 'w-verified-status-panel',
+        'w-missing-data-container', 'w-photo-upload-container', 'w-fee-notice-box',
+        'w-service-form-complaint', 'w-service-form-sports', 'w-check-req-result-box', 'w-check-cmp-result-box'
+    ];
+    hideIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
+
+    const verifyBox = document.getElementById('w-verify-identity-box');
+    if (verifyBox) verifyBox.style.display = 'block';
+
+    const btnNext1 = document.getElementById('w_btn_next_1');
+    if (btnNext1) {
+        btnNext1.disabled = true;
+        btnNext1.style.opacity = '0.5';
+        btnNext1.style.cursor = 'not-allowed';
+    }
+
+    const btnNext2 = document.getElementById('w_btn_next_2');
+    if (btnNext2) btnNext2.style.display = 'none';
+
+    const btnNext3 = document.getElementById('w_btn_next_3');
+    if (btnNext3) {
+        btnNext3.disabled = true;
+        btnNext3.style.opacity = '0.5';
+        btnNext3.style.cursor = 'not-allowed';
+    }
+}
+
 function wSelectPortalService(serviceKey) {
+    wResetPortalForms();
     wActiveService = serviceKey;
+
     document.getElementById('w-panel-step-0').style.display = 'none';
     document.getElementById('w-progress-bar').style.display = 'flex';
 
-    // Adjust UI labels
     const step2Label = document.getElementById('w_step_2_label');
     if (serviceKey === 'complaint') {
         if (step2Label) step2Label.innerText = 'التحقق وتفاصيل الشكوى';
@@ -727,8 +798,7 @@ function wSelectPortalService(serviceKey) {
 }
 
 function wBackToStep0() {
-    wSelectedStudent = null;
-    wVerifiedData = null;
+    wResetPortalForms();
     document.querySelectorAll('#w-panel-step-1, #w-panel-step-2, #w-panel-step-3, #w-panel-step-4, #w-panel-success').forEach(el => el.style.display = 'none');
     document.getElementById('w-progress-bar').style.display = 'none';
     document.getElementById('w-panel-step-0').style.display = 'block';
@@ -866,8 +936,15 @@ function wLimitSportsCheckboxes(chk) {
 }
 
 function wSubmitComplaintFinal() {
-    const title = document.getElementById('w_cmp_title_input').value.trim();
-    const details = document.getElementById('w_cmp_details_input').value.trim();
+    if (!wSelectedStudent || !wSelectedStudent.id) {
+        eessShowToast('يرجى اختيار وتحديد الطالب أولاً.', 'error');
+        return;
+    }
+
+    const titleEl = document.getElementById('w_cmp_title_input');
+    const detailsEl = document.getElementById('w_cmp_details_input');
+    const title = titleEl ? titleEl.value.trim() : '';
+    const details = detailsEl ? detailsEl.value.trim() : '';
 
     if (!title || !details) {
         eessShowToast('يرجى كتابة عنوان وتفاصيل الشكوى.', 'error');
@@ -875,8 +952,10 @@ function wSubmitComplaintFinal() {
     }
 
     const btn = document.getElementById('w_btn_submit_cmp');
-    btn.disabled = true;
-    btn.innerText = 'جاري إرسال الشكوى...';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerText = 'جاري إرسال الشكوى...';
+    }
 
     jQuery.post('<?php echo $ajax_url; ?>', {
         action: 'sm_public_submit_complaint',
@@ -884,24 +963,44 @@ function wSubmitComplaintFinal() {
         title: title,
         details: details
     }, function(res) {
-        btn.disabled = false;
-        btn.innerText = 'إرسال وتسجيل الشكوى ✓';
+        if (btn) {
+            btn.disabled = false;
+            btn.innerText = 'إرسال وتسجيل الشكوى ✓';
+        }
 
-        if (res.success && res.data) {
+        if (res && res.success && res.data) {
             document.getElementById('w-panel-step-2').style.display = 'none';
             document.getElementById('w-progress-bar').style.display = 'none';
             document.getElementById('w_success_title').innerText = 'تم تسجيل الشكوى بنجاح';
             document.getElementById('w_success_sub').innerText = 'تم تحويل الشكوى إلى إدارة المدرسة لمراجعتها والدراسة الإدارية.';
             document.getElementById('w_success_ref_no').innerText = res.data.reference_no;
             document.getElementById('w-panel-success').style.display = 'block';
+
+            if (titleEl) titleEl.value = '';
+            if (detailsEl) detailsEl.value = '';
+            const cntEl = document.getElementById('w_cmp_char_cnt');
+            if (cntEl) cntEl.innerText = '0 / 1000 حرف';
+
             eessShowToast('تم تسجيل الشكوى بنجاح.', 'success');
         } else {
-            eessShowToast(res.data || 'فشل إرسال الشكوى.', 'error');
+            const err = (res && res.data) ? res.data : 'فشل إرسال الشكوى. يرجى المحاولة لاحقاً.';
+            eessShowToast(err, 'error');
         }
+    }).fail(function() {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerText = 'إرسال وتسجيل الشكوى ✓';
+        }
+        eessShowToast('حدث خطأ أثناء الاتصال بالسيرفر. يرجى إعادة المحاولة.', 'error');
     });
 }
 
 function wSubmitSportsFinal() {
+    if (!wSelectedStudent || !wSelectedStudent.id) {
+        eessShowToast('يرجى اختيار وتحديد الطالب أولاً.', 'error');
+        return;
+    }
+
     const checked = Array.from(document.querySelectorAll('input[name="sports_activity[]"]:checked')).map(c => c.value);
     if (checked.length === 0) {
         eessShowToast('يرجى اختيار نشاط رياضي واحد على الأقل.', 'error');
@@ -909,18 +1008,22 @@ function wSubmitSportsFinal() {
     }
 
     const btn = document.getElementById('w_btn_submit_spt');
-    btn.disabled = true;
-    btn.innerText = 'جاري تسجيل الأنشطة...';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerText = 'جاري تسجيل الأنشطة...';
+    }
 
     jQuery.post('<?php echo $ajax_url; ?>', {
         action: 'sm_public_submit_sports_registration',
         student_id: wSelectedStudent.id,
         sports: checked
     }, function(res) {
-        btn.disabled = false;
-        btn.innerText = 'تأكيد التسجيل بالأنشطة الرياضية ✓';
+        if (btn) {
+            btn.disabled = false;
+            btn.innerText = 'تأكيد التسجيل بالأنشطة الرياضية ✓';
+        }
 
-        if (res.success) {
+        if (res && res.success) {
             document.getElementById('w-panel-step-2').style.display = 'none';
             document.getElementById('w-progress-bar').style.display = 'none';
             document.getElementById('w_success_title').innerText = 'تم تسجيل الرغبات الرياضية بنجاح';
@@ -929,8 +1032,15 @@ function wSubmitSportsFinal() {
             document.getElementById('w-panel-success').style.display = 'block';
             eessShowToast('تم التسجيل بالأنشطة الرياضية بنجاح.', 'success');
         } else {
-            eessShowToast(res.data || 'فشل التسجيل بالأنشطة الرياضية.', 'error');
+            const err = (res && res.data) ? res.data : 'فشل التسجيل بالأنشطة الرياضية.';
+            eessShowToast(err, 'error');
         }
+    }).fail(function() {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerText = 'تأكيد التسجيل بالأنشطة الرياضية ✓';
+        }
+        eessShowToast('حدث خطأ أثناء الاتصال بالسيرفر.', 'error');
     });
 }
 

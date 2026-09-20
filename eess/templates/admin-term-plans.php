@@ -131,7 +131,19 @@ $arabic_term_names = array(
     </div>
 
         <?php if ($is_reviewer):
-            $all_teachers = get_users(array('role' => 'sm_teacher'));
+            $user_scope = EESS_Org_Helper::get_user_scope($user_id);
+            if (!$user_scope['unrestricted'] && !empty($user_scope['schools'])) {
+                $all_teachers = get_users(array(
+                    'role' => 'sm_teacher',
+                    'meta_query' => array(
+                        'relation' => 'OR',
+                        array('key' => 'eess_school_id', 'value' => $user_scope['schools'], 'compare' => 'IN'),
+                        array('key' => 'sm_school_id', 'value' => $user_scope['schools'], 'compare' => 'IN')
+                    )
+                ));
+            } else {
+                $all_teachers = get_users(array('role' => 'sm_teacher'));
+            }
             // Filter strictly by PE & Health specialization scope
             $pe_teachers = array_filter($all_teachers, function($t) {
                 $spec = get_user_meta($t->ID, 'sm_specialization', true) ?: (get_user_meta($t->ID, 'specialization', true) ?: (get_user_meta($t->ID, 'subject', true) ?: ''));

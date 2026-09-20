@@ -952,6 +952,14 @@ class EESS_Org_Helper {
             $meta_school_id = get_user_meta($user_id, 'eess_school_id', true) ?: get_user_meta($user_id, 'sm_school_id', true);
             if ($meta_school_id) {
                 $schools[] = intval($meta_school_id);
+            } else {
+                $meta_school_name = get_user_meta($user_id, 'eess_school_name', true) ?: get_user_meta($user_id, 'sm_school_name', true);
+                if ($meta_school_name) {
+                    $sch_id = $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}eess_schools WHERE name = %s", $meta_school_name));
+                    if ($sch_id) {
+                        $schools[] = intval($sch_id);
+                    }
+                }
             }
         }
 
@@ -1768,9 +1776,10 @@ class EESS_Org_Helper {
         $is_late = false;
         if ($w_day == 1 && $w_time > $deadline_time_formatted) {
             $is_late = true;
-        } elseif ($w_day >= 2 && $w_day <= 4) { // Tuesday, Wednesday, Thursday
+        } elseif ($w_day == 2 || $w_day == 3) { // Tuesday or Wednesday
             $is_late = true;
         }
+        // Thursday (4), Friday (5), Saturday (6), and Sunday (7) are NEVER classified as late.
 
         // PE Exception rule
         $is_pe = (mb_strpos(mb_strtolower($subject), 'رياضية') !== false || mb_strpos(mb_strtolower($subject), 'بدنية') !== false || mb_strpos(mb_strtolower($subject), 'pe') !== false || mb_strpos(mb_strtolower($subject), 'physical') !== false);

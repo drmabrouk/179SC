@@ -347,7 +347,19 @@ $unique_subjects = array_unique(array_map(function($s){ return $s->name; }, $all
 
     <!-- Administrative Compliance & Follow-up Statistics for Lesson Preparation -->
     <?php if ($can_review):
-        $all_teachers_prep = get_users(array('role' => 'sm_teacher'));
+        $user_scope = EESS_Org_Helper::get_user_scope($user_id);
+        if (!$user_scope['unrestricted'] && !empty($user_scope['schools'])) {
+            $all_teachers_prep = get_users(array(
+                'role' => 'sm_teacher',
+                'meta_query' => array(
+                    'relation' => 'OR',
+                    array('key' => 'eess_school_id', 'value' => $user_scope['schools'], 'compare' => 'IN'),
+                    array('key' => 'sm_school_id', 'value' => $user_scope['schools'], 'compare' => 'IN')
+                )
+            ));
+        } else {
+            $all_teachers_prep = get_users(array('role' => 'sm_teacher'));
+        }
         $pe_teachers_prep = array_filter($all_teachers_prep, function($t) {
             $spec = get_user_meta($t->ID, 'sm_specialization', true) ?: (get_user_meta($t->ID, 'specialization', true) ?: (get_user_meta($t->ID, 'subject', true) ?: ''));
             return (mb_strpos($spec, 'بدنية') !== false || mb_strpos($spec, 'رياضة') !== false || mb_strpos($spec, 'Health') !== false || mb_strpos($spec, 'Physical') !== false);
@@ -2431,7 +2443,19 @@ if ($is_hod && !$is_admin && !$is_sys_admin) {
         $hod_subject
     ));
 } else {
-    $prep_report_teachers = get_users(array('role' => 'sm_teacher'));
+    $user_scope = EESS_Org_Helper::get_user_scope($user_id);
+    if (!$user_scope['unrestricted'] && !empty($user_scope['schools'])) {
+        $prep_report_teachers = get_users(array(
+            'role'       => 'sm_teacher',
+            'meta_query' => array(
+                'relation' => 'OR',
+                array('key' => 'eess_school_id', 'value' => $user_scope['schools'], 'compare' => 'IN'),
+                array('key' => 'sm_school_id', 'value' => $user_scope['schools'], 'compare' => 'IN')
+            )
+        ));
+    } else {
+        $prep_report_teachers = get_users(array('role' => 'sm_teacher'));
+    }
     $prep_report_submitted = $wpdb->get_results("SELECT p.*, u.display_name as teacher_name FROM {$wpdb->prefix}sm_lesson_preps p LEFT JOIN {$wpdb->users} u ON p.teacher_id = u.ID WHERE p.status IN ('submitted', 'approved', 'late') ORDER BY p.id DESC LIMIT 30");
 }
 
