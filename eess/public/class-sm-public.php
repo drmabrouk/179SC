@@ -14597,6 +14597,11 @@ class SM_Public {
     }
 
     public function ajax_public_update_student_missing_data() {
+        $settings = get_option('sm_exit_card_settings', array());
+        if (($settings['service_update_data'] ?? 'yes') === 'no') {
+            wp_send_json_error('خدمة تحديث بيانات الطالب غير متاحة حالياً بالنظام.');
+        }
+
         $student_id  = intval($_POST['student_id'] ?? 0);
         $verify_code = sanitize_text_field($_POST['verify_code'] ?? '');
 
@@ -14731,6 +14736,11 @@ class SM_Public {
     }
 
     public function ajax_public_submit_exit_card() {
+        $settings = get_option('sm_exit_card_settings', array());
+        if (($settings['service_exit_card'] ?? 'yes') === 'no') {
+            wp_send_json_error('خدمة طلب بطاقات تصاريح الخروج غير متاحة حالياً بالنظام.');
+        }
+
         $student_id = intval($_POST['student_id'] ?? 0);
         $verify_code = sanitize_text_field($_POST['verify_code'] ?? '');
         $parent_name = sanitize_text_field($_POST['parent_name'] ?? '');
@@ -15005,10 +15015,10 @@ class SM_Public {
         $max_reqs = max(1, intval($_POST['max_requests'] ?? 3));
         $redirect = sanitize_text_field($_POST['redirect_discipline'] ?? 'yes');
 
-        $service_update_data = sanitize_text_field($_POST['service_update_data'] ?? 'yes');
-        $service_exit_card   = sanitize_text_field($_POST['service_exit_card'] ?? 'yes');
-        $service_complaint   = sanitize_text_field($_POST['service_complaint'] ?? 'yes');
-        $service_sports      = sanitize_text_field($_POST['service_sports'] ?? 'yes');
+        $service_update_data = isset($_POST['service_update_data']) ? sanitize_text_field($_POST['service_update_data']) : 'no';
+        $service_exit_card   = isset($_POST['service_exit_card']) ? sanitize_text_field($_POST['service_exit_card']) : 'no';
+        $service_complaint   = isset($_POST['service_complaint']) ? sanitize_text_field($_POST['service_complaint']) : 'no';
+        $service_sports      = isset($_POST['service_sports']) ? sanitize_text_field($_POST['service_sports']) : 'no';
 
         $existing = get_option('sm_exit_card_settings', array());
         if (!is_array($existing)) $existing = array();
@@ -15140,6 +15150,11 @@ class SM_Public {
 
     public function ajax_public_submit_complaint() {
         SM_DB::ensure_portal_tables_exist();
+
+        $settings = get_option('sm_exit_card_settings', array());
+        if (($settings['service_complaint'] ?? 'yes') === 'no') {
+            wp_send_json_error('خدمة تقديم الشكاوى والاقتراحات غير متاحة حالياً بالنظام.');
+        }
 
         $student_id = intval($_POST['student_id'] ?? 0);
         $title      = sanitize_text_field($_POST['title'] ?? '');
@@ -15306,6 +15321,11 @@ class SM_Public {
 
     public function ajax_public_submit_sports_registration() {
         SM_DB::ensure_portal_tables_exist();
+
+        $settings = get_option('sm_exit_card_settings', array());
+        if (($settings['service_sports'] ?? 'yes') === 'no') {
+            wp_send_json_error('خدمة التسجيل بالأنشطة الرياضية غير متاحة حالياً بالنظام.');
+        }
 
         $student_id = intval($_POST['student_id'] ?? 0);
         $raw_sports = $_POST['sports'] ?? array();
