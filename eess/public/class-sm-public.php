@@ -10926,11 +10926,11 @@ class SM_Public {
                     .card-field-val { color: #0f172a; font-weight: 900; white-space: nowrap; }
 
                     /* Barcode Stack Aligned Left Above Bottom Strip */
-                    .card-qr-stack { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; width: 32mm; flex-shrink: 0; text-align: center; margin-top: auto; }
-                    .card-qr-box { width: 32mm; height: 15mm; border: none; border-radius: 0; padding: 0; background: transparent; box-shadow: none; }
+                    .card-qr-stack { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; width: 33mm; flex-shrink: 0; text-align: center; margin-top: auto; }
+                    .card-qr-box { width: 33mm; height: 16.5mm; border: none; border-radius: 0; padding: 0; background: transparent; box-shadow: none; margin-top: 3px; }
                     .card-qr-box svg { width: 100%; height: 100%; display: block; }
                     .card-qr-box svg rect:first-child { fill: transparent !important; }
-                    .card-barcode-code-label { font-size: 7px; font-weight: 900; color: #0f172a; font-family: monospace, sans-serif; letter-spacing: 1.5px; text-align: center; width: 100%; margin-top: 1px; display: block; white-space: nowrap; }
+                    .card-barcode-code-label { font-size: 7px; font-weight: 900; color: #0f172a; font-family: monospace, sans-serif; letter-spacing: 1.5px; text-align: center; width: 100%; margin-top: -1px; display: block; white-space: nowrap; }
                     .card-serial-text { display: none !important; }
 
                     /* Footer Area */
@@ -12676,6 +12676,15 @@ class SM_Public {
             $formatted_dt = date('Y-m-d H:i:s', strtotime($raw_dt));
             $update_data['submission_time'] = $formatted_dt;
             $update_data['created_at'] = $formatted_dt;
+        }
+
+        if ($status !== 'late') {
+            $update_data['delay_seconds'] = 0;
+        } else {
+            $subj = $wpdb->get_var($wpdb->prepare("SELECT subject FROM {$wpdb->prefix}sm_lesson_preps WHERE id = %d", $prep_id));
+            $sub_ts = !empty($raw_dt) ? strtotime($raw_dt) : time();
+            $calc = EESS_Org_Helper::calculate_lesson_prep_status($subj, $sub_ts);
+            $update_data['delay_seconds'] = $calc['delay_seconds'];
         }
 
         $updated = $wpdb->update("{$wpdb->prefix}sm_lesson_preps", $update_data, array('id' => $prep_id));
