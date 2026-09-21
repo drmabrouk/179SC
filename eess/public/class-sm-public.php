@@ -15540,9 +15540,24 @@ class SM_Public {
             wp_send_json_error('فشل حفظ الصورة: ' . $attachment_id->get_error_message());
         }
 
+        $attached_file = get_attached_file($attachment_id);
+        if ($attached_file && file_exists($attached_file)) {
+            // Compress & Resize image to max 800x800 @ 82% quality for lightweight storage & fast loading
+            $editor = wp_get_image_editor($attached_file);
+            if (!is_wp_error($editor)) {
+                $editor->resize(800, 800, false);
+                $editor->set_quality(82);
+                $editor->save($attached_file);
+            }
+        }
+
         $new_photo_url = wp_get_attachment_url($attachment_id);
+        $now_time      = current_time('mysql');
+        $formatted_time = date_i18n('Y-m-d h:i A', strtotime($now_time));
+
         global $wpdb;
         $wpdb->update("{$wpdb->prefix}sm_students", array('photo_url' => $new_photo_url), array('id' => $student_id));
+        SM_DB::update_student_meta($student_id, 'photo_updated_at', $now_time);
         wp_cache_flush();
 
         if (!empty($student->parent_user_id)) {
@@ -15552,8 +15567,9 @@ class SM_Public {
         SM_Logger::log('رفع صورة طالب', "تم التقاط/تحديث الصورة الشخصية للطالب: {$student->name} (ID: {$student_id})");
 
         wp_send_json_success(array(
-            'message'   => 'تم رفع وتحديث صورة الطالب بنجاح.',
-            'photo_url' => $new_photo_url
+            'message'          => 'تم رفع وتحديث صورة الطالب بنجاح.',
+            'photo_url'        => $new_photo_url,
+            'photo_updated_at' => $formatted_time
         ));
     }
 
@@ -15578,7 +15594,35 @@ class SM_Public {
         SM_DB::ensure_portal_tables_exist();
 
         $acad_year = '2025/2026';
-        $ref_no    = 'EX-' . date('Y') . '-' . sprintf('%06d', rand(1000, 999999));
+
+        // Check if student already has an active request
+        $existing_req = $wpdb->get_row($wpdb->prepare(
+            "SELECT id, reference_no, status, created_at FROM {$wpdb->prefix}sm_exit_card_requests WHERE student_id = %d AND academic_year = %s AND status NOT IN ('cancelled', 'rejected') ORDER BY id DESC LIMIT 1",
+            $student_id, $acad_year
+        ));
+
+        if ($existing_req) {
+            $photo_updated_at = SM_DB::get_student_meta($student_id, 'photo_updated_at', true);
+            $photo_time_formatted = !empty($photo_updated_at) ? date_i18n('Y-m-d h:i A', strtotime($photo_updated_at)) : 'غير محدد';
+
+            wp_send_json_success(array(
+                'message'          => 'يوجد طلب تصريح خروج نشط بالفعل لهذا الطالب.',
+                'reference_no'     => $existing_req->reference_no,
+                'request_id'       => $existing_req->id,
+                'status'           => $existing_req->status,
+                'status_label'     => self::eess_get_exit_card_status_label($existing_req->status),
+                'student_name'     => $student->name,
+                'student_code'     => $student->student_code ?: ('STU-' . $student->id),
+                'class_name'       => $student->class_name,
+                'section'          => $student->section,
+                'photo_url'        => $student->photo_url,
+                'photo_updated_at' => $photo_time_formatted,
+                'requested_at'     => date_i18n('Y-m-d h:i A', strtotime($existing_req->created_at)),
+                'already_exists'   => true
+            ));
+        }
+
+        $ref_no = 'EX-' . date('Y') . '-' . sprintf('%06d', rand(1000, 999999));
 
         $inserted = $wpdb->insert("{$wpdb->prefix}sm_exit_card_requests", array(
             'reference_no'        => $ref_no,
@@ -15588,23 +15632,78 @@ class SM_Public {
             'academic_year'       => $acad_year,
             'reason'              => 'طلب تصريح خروج طالب عبر البوابة السريعة',
             'requested_date'      => current_time('Y-m-d'),
-            'status'              => 'approved',
+            'status'              => 'submitted',
             'verification_status' => 'verified_by_portal',
             'verified_at'         => current_time('mysql'),
             'created_at'          => current_time('mysql')
         ));
 
         if (!$inserted) {
-            wp_send_json_error('فشل تسجيل طلب تصريح الخروج بالخادم.');
+            wp_send_json_error('فشل تسجيل طلب تصريح الخروج بجدول البيانات.');
         }
 
         $req_id = $wpdb->insert_id;
+        $photo_updated_at = SM_DB::get_student_meta($student_id, 'photo_updated_at', true);
+        $photo_time_formatted = !empty($photo_updated_at) ? date_i18n('Y-m-d h:i A', strtotime($photo_updated_at)) : 'حديثاً';
+
         SM_Logger::log('طلب بطاقة خروج سريع', "تم تقديم طلب تصريح خروج فوري للطالب: {$student->name} (الرقم المرجعي: {$ref_no})");
 
         wp_send_json_success(array(
-            'message'      => 'تم تسجيل واستخراج طلب بطاقة تصريح الخروج بنجاح.',
-            'reference_no' => $ref_no,
-            'request_id'   => $req_id
+            'message'          => 'تم تسجيل واستخراج طلب بطاقة تصريح الخروج بنجاح.',
+            'reference_no'     => $ref_no,
+            'request_id'       => $req_id,
+            'status'           => 'submitted',
+            'status_label'     => 'قيد المراجعة والاعتماد',
+            'student_name'     => $student->name,
+            'student_code'     => $student->student_code ?: ('STU-' . $student->id),
+            'class_name'       => $student->class_name,
+            'section'          => $student->section,
+            'photo_url'        => $student->photo_url,
+            'photo_updated_at' => $photo_time_formatted,
+            'requested_at'     => date_i18n('Y-m-d h:i A', strtotime(current_time('mysql'))),
+            'already_exists'   => false
+        ));
+    }
+
+    public function ajax_public_withdraw_exit_card_request() {
+        $token      = sanitize_text_field($_POST['portal_token'] ?? '');
+        $student_id = intval($_POST['student_id'] ?? 0);
+        $req_id     = intval($_POST['request_id'] ?? 0);
+
+        if (!self::is_portal_token_valid($token)) {
+            wp_send_json_error('جلسة البوابة غير صالحة أو منتهية.');
+        }
+
+        if (!$student_id) {
+            wp_send_json_error('معرف الطالب غير محدد.');
+        }
+
+        global $wpdb;
+        SM_DB::ensure_portal_tables_exist();
+
+        if ($req_id > 0) {
+            $req = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}sm_exit_card_requests WHERE id = %d AND student_id = %d", $req_id, $student_id));
+        } else {
+            $req = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}sm_exit_card_requests WHERE student_id = %d AND status NOT IN ('cancelled', 'rejected') ORDER BY id DESC LIMIT 1", $student_id));
+        }
+
+        if (!$req) {
+            wp_send_json_error('لم يتم العثور على طلب تصريح خروج نشط لهذا الطالب لسحبه.');
+        }
+
+        // Block withdrawal if request status is printing or issued
+        if (in_array($req->status, array('printing', 'issued', 'printed'))) {
+            wp_send_json_error('عذراً، لا يمكن سحب أو إلغاء الطلب بعد دخوله مرحلة الطباعة والطباعة المباشرة.');
+        }
+
+        $wpdb->update("{$wpdb->prefix}sm_exit_card_requests", array('status' => 'cancelled'), array('id' => $req->id));
+
+        $student = SM_DB::get_student_by_id($student_id);
+        SM_Logger::log('سحب طلب تصريح خروج', "تم سحب وإلغاء طلب تصريح الخروج (رقم: {$req->reference_no}) للطالب: " . ($student->name ?? ''));
+
+        wp_send_json_success(array(
+            'message'      => 'تم سحب وإلغاء طلب تصريح الخروج بنجاح.',
+            'reference_no' => $req->reference_no
         ));
     }
 }
