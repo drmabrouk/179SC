@@ -1113,14 +1113,21 @@ function eessSubmitInstantExitCardRequest() {
 
             if (typeof wLoadCardRequestsFull === 'function') wLoadCardRequestsFull();
         } else {
-            eessShowToast((res && res.data) ? res.data : 'فشل تسجيل الطلب بالخادم.', 'error');
+            var errMsg = (res && res.data) ? (typeof res.data === 'string' ? res.data : (res.data.message || 'فشل تسجيل الطلب بالخادم.')) : 'فشل تسجيل الطلب بالخادم.';
+            eessShowToast(errMsg, 'error');
         }
     }).fail(function(xhr, status, error) {
         if (btn) {
             btn.disabled = false;
             btn.innerText = '🚀 استخراج وتأكيد طلب بطاقة الخروج';
         }
-        eessShowToast('حدث خطأ في الاتصال بالخادم: ' + (error || 'يرجى المحاولة مرة أخرى.'), 'error');
+        var errDetail = 'خطأ في الاتصال بالخادم.';
+        if (xhr && xhr.responseJSON && xhr.responseJSON.data) {
+            errDetail = typeof xhr.responseJSON.data === 'string' ? xhr.responseJSON.data : (xhr.responseJSON.data.message || errDetail);
+        } else if (xhr && xhr.responseText && xhr.responseText.length < 200) {
+            errDetail = xhr.responseText;
+        }
+        eessShowToast(errDetail, 'error');
     });
 }
 
