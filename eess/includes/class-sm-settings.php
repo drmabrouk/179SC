@@ -767,8 +767,12 @@ class SM_Settings {
             'sm_public_withdraw_exit_card_request'
         );
 
+        if (in_array($clean_action, $public_actions)) {
+            return true;
+        }
+
         if (!$user_id) {
-            return in_array($clean_action, $public_actions);
+            return false;
         }
 
         $user = get_userdata($user_id);
