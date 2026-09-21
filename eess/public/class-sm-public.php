@@ -14451,17 +14451,21 @@ class SM_Public {
             wp_send_json_error('لم يتم العثور على طالب يطابق الاسم المدخل.');
         }
 
+        $norm_query = self::normalize_arabic_str($clean_query);
         $safe_suggestions = array();
         foreach ($results as $s) {
             $norm_name = self::normalize_arabic_str($s->name);
             $exact_match = ($norm_name === $norm_query || strpos($norm_name, $norm_query) === 0);
 
             $safe_suggestions[] = array(
-                'id' => $s->id,
+                'id'           => $s->id,
+                'name'         => $s->name,
                 'display_name' => $s->name,
-                'class_name' => $s->class_name ?: 'الصف الدراسي',
-                'section' => $s->section ?: 'أ',
-                'exact_match' => $exact_match
+                'student_code' => $s->student_code ?: ('STU-' . $s->id),
+                'class_name'   => $s->class_name ?: 'الصف الدراسي',
+                'section'      => $s->section ?: 'أ',
+                'photo_url'    => $s->photo_url ?: '',
+                'exact_match'  => $exact_match
             );
         }
 
