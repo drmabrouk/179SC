@@ -754,7 +754,13 @@ class SM_Settings {
             'sm_get_pending_announcements',
             'sm_public_search_student',
             'sm_public_verify_student',
-            'sm_public_submit_exit_card'
+            'sm_public_update_student_missing_data',
+            'sm_public_submit_exit_card',
+            'sm_submit_exit_card_request',
+            'sm_public_check_previous_request',
+            'sm_public_submit_complaint',
+            'sm_public_check_complaint_status',
+            'sm_public_submit_sports_registration'
         );
 
         if (!$user_id) {

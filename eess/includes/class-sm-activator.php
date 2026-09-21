@@ -702,9 +702,9 @@ class SM_Activator {
                 'title'   => 'تسجيل حضور الفصول',
                 'content' => '[sm_class_attendance]',
             ),
-            'card' => array(
-                'title'   => 'بوابة بطاقات الطلاب',
-                'content' => '[card]',
+            'stu' => array(
+                'title'   => 'بوابة خدمات الطلاب والبطاقات',
+                'content' => '[stu]',
             ),
         );
 
@@ -718,11 +718,11 @@ class SM_Activator {
                     'post_type'    => 'page',
                     'post_name'    => $slug,
                 ));
-                if ($slug === 'card' && $page_id && !is_wp_error($page_id)) {
+                if ($slug === 'stu' && $page_id && !is_wp_error($page_id)) {
                     update_option('eess_exit_card_portal_page_id', $page_id);
                 }
             } else {
-                if ($slug === 'card' && $page_exists->ID) {
+                if ($slug === 'stu' && $page_exists->ID) {
                     update_option('eess_exit_card_portal_page_id', $page_exists->ID);
                 }
             }
