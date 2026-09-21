@@ -300,14 +300,19 @@ $service_sports       = $card_settings['service_sports'] ?? 'yes';
             <!-- STEP 2: DYNAMIC SERVICE STEP (VERIFICATION / COMPLAINT / SPORTS / UPDATE DATA) -->
             <div id="w-panel-step-2" style="display: none;">
 
-                <!-- IDENTITY VERIFICATION BOX (Hidden if name_only) -->
+                <!-- IDENTITY VERIFICATION BOX (Unified 3-Factor: Full Name + Student Code / National ID + DOB) -->
                 <div id="w-verify-identity-box" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px; margin-bottom: 18px;">
                     <h4 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 800; color: #0f172a;">تأكيد التحقق من هوية الطالب</h4>
-                    <p style="margin: 0 0 14px 0; font-size: 12px; color: #64748b; font-weight: 600;">يرجى إدخال بيانات التحقق المطلوبة للأمان:</p>
+                    <p style="margin: 0 0 14px 0; font-size: 12px; color: #64748b; font-weight: 600;">يرجى إدخال كود الطالب أو الهوية الوطنية وتاريخ الميلاد للمتابعة:</p>
 
                     <div style="margin-bottom: 12px;">
-                        <label style="font-size: 12px; font-weight: 700; color: #334155; display: block; margin-bottom: 4px;">رمز التحقق المعتمد <span style="color:#ef4444;">*</span></label>
+                        <label style="font-size: 12px; font-weight: 700; color: #334155; display: block; margin-bottom: 4px;">كود الطالب أو رقم الهوية الوطنية <span style="color:#ef4444;">*</span></label>
                         <input type="text" id="w_verify_code_input" placeholder="أدخل كود الطالب أو الهوية الوطنية..." style="width: 100%; height: 44px; border-radius: 10px; border: 1.5px solid #cbd5e1; padding: 0 14px; font-size: 13px; font-weight: 700; box-sizing: border-box;">
+                    </div>
+
+                    <div style="margin-bottom: 14px;">
+                        <label style="font-size: 12px; font-weight: 700; color: #334155; display: block; margin-bottom: 4px;">تاريخ الميلاد المسجل <span style="color:#ef4444;">*</span></label>
+                        <input type="date" id="w_verify_dob_input" style="width: 100%; height: 44px; border-radius: 10px; border: 1.5px solid #cbd5e1; padding: 0 14px; font-size: 13px; font-weight: 700; box-sizing: border-box;">
                     </div>
 
                     <button type="button" onclick="wVerifyStudentIdentity()" id="w_btn_verify_id" style="width: 100%; height: 42px; background: #0f172a; color: white; border: none; border-radius: 10px; font-weight: 800; font-size: 13px; cursor: pointer;">تأكيد والتحقق من الهوية</button>
@@ -724,6 +729,9 @@ function wResetPortalForms() {
     const verInp = document.getElementById('w_verify_code_input');
     if (verInp) verInp.value = '';
 
+    const dobInp = document.getElementById('w_verify_dob_input');
+    if (dobInp) dobInp.value = '';
+
     const cmpTitle = document.getElementById('w_cmp_title_input');
     if (cmpTitle) cmpTitle.value = '';
 
@@ -889,16 +897,39 @@ function wSelectStudent(id, displayName, className, section) {
 }
 
 function wVerifyStudentIdentity() {
+    if (wActiveService === 'update_data') {
+        jQuery.post('<?php echo $ajax_url; ?>', {
+            action: 'sm_public_verify_student',
+            student_id: wSelectedStudent.id,
+            service: 'update_data',
+            verify_code: 'NAME_ONLY'
+        }, function(res) {
+            if (res.success && res.data) {
+                wVerifiedData = res.data;
+                var vBox = document.getElementById('w-verify-identity-box');
+                if (vBox) vBox.style.display = 'none';
+                wRenderMissingDataForm(res.data);
+            } else {
+                eessShowToast(res.data || 'تعذر جلب بيانات الطالب.', 'error');
+            }
+        });
+        return;
+    }
+
     const codeVal = document.getElementById('w_verify_code_input').value.trim();
-    if (!codeVal && wVerifyMethod !== 'name_only') {
-        eessShowToast('يرجى إدخال رمز التحقق المطلوب.', 'error');
+    const dobVal  = document.getElementById('w_verify_dob_input').value.trim();
+
+    if (!codeVal) {
+        eessShowToast('يرجى إدخال كود الطالب أو رقم الهوية الوطنية.', 'error');
         return;
     }
 
     jQuery.post('<?php echo $ajax_url; ?>', {
         action: 'sm_public_verify_student',
         student_id: wSelectedStudent.id,
-        verify_code: codeVal || 'NAME_ONLY'
+        verify_code: codeVal,
+        dob: dobVal,
+        service: wActiveService
     }, function(res) {
         if (res.success && res.data) {
             wVerifiedData = res.data;
@@ -912,17 +943,119 @@ function wVerifyStudentIdentity() {
             panel.innerHTML = html;
             panel.style.display = 'block';
 
-            // Show service specific forms
             if (wActiveService === 'complaint') {
                 document.getElementById('w-service-form-complaint').style.display = 'block';
             } else if (wActiveService === 'sports') {
                 document.getElementById('w-service-form-sports').style.display = 'block';
             } else if (wActiveService === 'exit_card') {
+                if (res.data.has_photo) {
+                    document.getElementById('w-photo-upload-container').style.display = 'none';
+                } else {
+                    document.getElementById('w-photo-upload-container').style.display = 'block';
+                }
                 const btnNext2 = document.getElementById('w_btn_next_2');
                 if (btnNext2) btnNext2.style.display = 'inline-block';
             }
         } else {
-            eessShowToast(res.data || 'رمز التحقق غير صحيح.', 'error');
+            eessShowToast(res.data || 'رمز التحقق أو تاريخ الميلاد غير صحيح.', 'error');
+        }
+    });
+}
+
+function wRenderMissingDataForm(data) {
+    var container = document.getElementById('w-missing-data-container');
+    var renderBox = document.getElementById('w_missing_fields_render_box');
+    if (!container || !renderBox) return;
+
+    var student = (data && data.student) ? data.student : {};
+    var missing = (data && data.missing_fields) ? data.missing_fields : [];
+
+    var html = '';
+
+    // Always show National ID field if in update_data mode or if missing
+    if (missing.includes('national_id') || wActiveService === 'update_data') {
+        var isReq = missing.includes('national_id') || !student.national_id;
+        html += '<div style="margin-bottom:12px;">';
+        html += '<label style="font-size:12px; font-weight:800; color:#0f172a; display:block; margin-bottom:4px;">رقم الهوية الوطنية الإماراتية (15 رقم) ' + (isReq ? '<span style="color:#ef4444;">*</span>' : '') + '</label>';
+        html += '<input type="text" id="w_inp_national_id" value="' + (student.national_id || '') + '" placeholder="784-YYYY-XXXXXXX-X" ' + (isReq ? 'required' : '') + ' style="width:100%; height:40px; border-radius:8px; border:1px solid #cbd5e1; padding:0 12px; font-size:12.5px; font-weight:700;">';
+        html += '</div>';
+    }
+
+    if (missing.includes('dob') || wActiveService === 'update_data') {
+        html += '<div style="margin-bottom:12px;">';
+        html += '<label style="font-size:12px; font-weight:800; color:#0f172a; display:block; margin-bottom:4px;">تاريخ الميلاد</label>';
+        html += '<input type="date" id="w_inp_dob" value="' + (student.dob || '') + '" style="width:100%; height:40px; border-radius:8px; border:1px solid #cbd5e1; padding:0 12px; font-size:12.5px; font-weight:700;">';
+        html += '</div>';
+    }
+
+    if (missing.includes('guardian_name') || wActiveService === 'update_data') {
+        html += '<div style="margin-bottom:12px;">';
+        html += '<label style="font-size:12px; font-weight:800; color:#0f172a; display:block; margin-bottom:4px;">اسم ولي الأمر الثلاثي</label>';
+        html += '<input type="text" id="w_inp_guardian_name" value="' + (student.guardian_name || '') + '" placeholder="الاسم الكامل لولي الأمر..." style="width:100%; height:40px; border-radius:8px; border:1px solid #cbd5e1; padding:0 12px; font-size:12.5px; font-weight:700;">';
+        html += '</div>';
+    }
+
+    if (missing.includes('guardian_phone') || wActiveService === 'update_data') {
+        html += '<div style="margin-bottom:12px;">';
+        html += '<label style="font-size:12px; font-weight:800; color:#0f172a; display:block; margin-bottom:4px;">رقم هاتف التواصل مع ولي الأمر</label>';
+        html += '<input type="tel" id="w_inp_guardian_phone" value="' + (student.guardian_phone || '') + '" placeholder="+971 50 1234567" style="width:100%; height:40px; border-radius:8px; border:1px solid #cbd5e1; padding:0 12px; font-size:12.5px; font-weight:700;">';
+        html += '</div>';
+    }
+
+    if (missing.includes('nationality') || missing.includes('emirate') || wActiveService === 'update_data') {
+        html += '<div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">';
+        html += '<div>';
+        html += '<label style="font-size:12px; font-weight:800; color:#0f172a; display:block; margin-bottom:4px;">الجنسية</label>';
+        html += '<input type="text" id="w_inp_nationality" value="' + (student.nationality || 'إماراتي') + '" style="width:100%; height:40px; border-radius:8px; border:1px solid #cbd5e1; padding:0 12px; font-size:12.5px; font-weight:700;">';
+        html += '</div>';
+        html += '<div>';
+        html += '<label style="font-size:12px; font-weight:800; color:#0f172a; display:block; margin-bottom:4px;">إمارة الإقامة</label>';
+        html += '<input type="text" id="w_inp_emirate" value="' + (student.emirate || 'الشارقة') + '" style="width:100%; height:40px; border-radius:8px; border:1px solid #cbd5e1; padding:0 12px; font-size:12.5px; font-weight:700;">';
+        html += '</div>';
+        html += '</div>';
+    }
+
+    renderBox.innerHTML = html;
+    container.style.display = 'block';
+}
+
+function wSubmitMissingData(e) {
+    if (e) e.preventDefault();
+    if (!wSelectedStudent || !wSelectedStudent.id) return;
+
+    var natInp = document.getElementById('w_inp_national_id');
+    var dobInp = document.getElementById('w_inp_dob');
+    var gNameInp = document.getElementById('w_inp_guardian_name');
+    var gPhoneInp = document.getElementById('w_inp_guardian_phone');
+    var natioInp = document.getElementById('w_inp_nationality');
+    var emiInp = document.getElementById('w_inp_emirate');
+
+    var postData = {
+        action: 'sm_public_update_student_missing_data',
+        student_id: wSelectedStudent.id,
+        national_id: natInp ? natInp.value.trim() : '',
+        dob: dobInp ? dobInp.value.trim() : '',
+        guardian_name: gNameInp ? gNameInp.value.trim() : '',
+        guardian_phone: gPhoneInp ? gPhoneInp.value.trim() : '',
+        nationality: natioInp ? natioInp.value.trim() : '',
+        emirate_residence: emiInp ? emiInp.value.trim() : ''
+    };
+
+    var btn = document.getElementById('w_btn_save_missing');
+    if (btn) { btn.disabled = true; btn.innerText = 'جاري الحفظ...'; }
+
+    jQuery.post('<?php echo $ajax_url; ?>', postData, function(res) {
+        if (btn) { btn.disabled = false; btn.innerText = 'حفظ وتحديث البيانات الحالية'; }
+        if (res.success) {
+            eessShowToast(res.data.message || 'تم تحديث البيانات بنجاح.', 'success');
+            document.getElementById('w-missing-data-container').style.display = 'none';
+
+            if (res.data.notice) {
+                var noticeHtml = '<div style="background:#fffbe3; border:1.5px solid #fde047; border-radius:12px; padding:16px; margin-top:14px; font-size:13px; font-weight:800; color:#854d0e; line-height:1.6;">' + res.data.notice + '</div>';
+                document.getElementById('w-verified-status-panel').innerHTML += noticeHtml;
+            }
+        } else {
+            eessShowToast(res.data || 'فشل تحديث البيانات.', 'error');
         }
     });
 }
@@ -1007,6 +1140,9 @@ function wSubmitSportsFinal() {
         return;
     }
 
+    const codeVal = document.getElementById('w_verify_code_input') ? document.getElementById('w_verify_code_input').value.trim() : '';
+    const dobVal  = document.getElementById('w_verify_dob_input') ? document.getElementById('w_verify_dob_input').value.trim() : '';
+
     const btn = document.getElementById('w_btn_submit_spt');
     if (btn) {
         btn.disabled = true;
@@ -1016,7 +1152,9 @@ function wSubmitSportsFinal() {
     jQuery.post('<?php echo $ajax_url; ?>', {
         action: 'sm_public_submit_sports_registration',
         student_id: wSelectedStudent.id,
-        sports: checked
+        sports: checked,
+        verify_code: codeVal,
+        dob: dobVal
     }, function(res) {
         if (btn) {
             btn.disabled = false;
@@ -1326,8 +1464,15 @@ function wGoToStep(stepNum) {
         if (el) el.style.display = (i === stepNum) ? 'block' : 'none';
     }
 
-    if (stepNum === 2 && wVerifyMethod === 'name_only') {
-        wVerifyStudentIdentity();
+    if (stepNum === 2) {
+        if (wActiveService === 'update_data' || wVerifyMethod === 'name_only') {
+            var vBox = document.getElementById('w-verify-identity-box');
+            if (vBox) vBox.style.display = 'none';
+            wVerifyStudentIdentity();
+        } else {
+            var vBox = document.getElementById('w-verify-identity-box');
+            if (vBox) vBox.style.display = 'block';
+        }
     }
 }
 

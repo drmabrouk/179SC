@@ -352,6 +352,7 @@ class SM_Public {
         add_shortcode('sm_login', array($this, 'shortcode_login'));
         add_shortcode('sm_admin', array($this, 'shortcode_admin_dashboard'));
         add_shortcode('sm_class_attendance', array($this, 'shortcode_class_attendance'));
+        add_shortcode('stu', array($this, 'shortcode_public_card_wizard'));
         add_shortcode('card', array($this, 'shortcode_public_card_wizard'));
     }
 
@@ -14477,8 +14478,10 @@ class SM_Public {
     public function ajax_public_verify_student() {
         $student_id  = intval($_POST['student_id'] ?? 0);
         $verify_code = sanitize_text_field($_POST['verify_code'] ?? '');
+        $service     = sanitize_text_field($_POST['service'] ?? ($_POST['active_service'] ?? ''));
+        $dob_input   = sanitize_text_field($_POST['dob'] ?? '');
 
-        if (!$student_id || empty($verify_code)) {
+        if (!$student_id) {
             wp_send_json_error('بيانات التحقق غير مكتملة.');
         }
 
@@ -14487,33 +14490,34 @@ class SM_Public {
             wp_send_json_error('بيانات الطالب غير صحيحة أو تم نقل الملف.');
         }
 
-        $settings = get_option('sm_exit_card_settings', array(
-            'portal_mode' => 'card_application',
-            'verify_method' => 'both',
-            'required_fields' => array('guardian_phone', 'dob'),
-            'max_requests' => 3,
-            'redirect_discipline' => 'yes'
-        ));
-
-        $verify_method = $settings['verify_method'] ?? 'both';
-        $clean_input = strtolower(trim($verify_code));
-        $stu_code = strtolower(trim($student->student_code ?: ''));
-        $nat_id   = strtolower(trim($student->national_id ?: ''));
-
-        $matched = false;
-        if ($verify_method === 'code') {
-            $matched = (!empty($stu_code) && $clean_input === $stu_code);
-        } elseif ($verify_method === 'nat_id') {
-            $matched = (!empty($nat_id) && $clean_input === $nat_id);
+        // Service 1: Data Update mode - No pre-verification by code/national_id required
+        if ($service === 'update_data' || $verify_code === 'NAME_ONLY') {
+            $matched = true;
         } else {
-            $matched = (($clean_input === $stu_code && !empty($stu_code)) || ($clean_input === $nat_id && !empty($nat_id)));
-        }
+            if (empty($verify_code)) {
+                wp_send_json_error('يرجى إدخال كود الطالب أو رقم الهوية الوطنية للتحقق.');
+            }
+            $clean_input = strtolower(trim($verify_code));
+            $stu_code    = strtolower(trim($student->student_code ?: ''));
+            $nat_id      = strtolower(trim($student->national_id ?: ''));
 
-        if (!$matched) {
-            $err_msg = 'رمز التحقق غير مطابق لبيانات الطالب المسجلة.';
-            if ($verify_method === 'code') $err_msg = 'كود الطالب المدخل غير مطابق للبيانات المسجلة.';
-            elseif ($verify_method === 'nat_id') $err_msg = 'رقم الهوية الوطنية غير مطابق للبيانات المسجلة.';
-            wp_send_json_error($err_msg);
+            $code_matched = (!empty($stu_code) && $clean_input === $stu_code) || (!empty($nat_id) && $clean_input === $nat_id);
+
+            $dob_matched = true;
+            if (!empty($dob_input) && !empty($student->dob) && $student->dob !== '0000-00-00') {
+                $formatted_dob = date('Y-m-d', strtotime($dob_input));
+                $dob_matched   = ($formatted_dob === date('Y-m-d', strtotime($student->dob)));
+            }
+
+            $matched = $code_matched && $dob_matched;
+
+            if (!$matched) {
+                if (!$code_matched) {
+                    wp_send_json_error('كود الطالب أو رقم الهوية الوطنية المدخل غير مطابق لبيانات الطالب المسجلة.');
+                } else {
+                    wp_send_json_error('تاريخ الميلاد المدخل غير مطابق لسجلات الطالب المسجلة.');
+                }
+            }
         }
 
         global $wpdb;
@@ -14566,6 +14570,14 @@ class SM_Public {
             }
         }
 
+        // Always enforce National ID as required field if missing, incomplete, or invalid in student record
+        $clean_nat_id = preg_replace('/\D/', '', $student->national_id ?: '');
+        if (empty($clean_nat_id) || strlen($clean_nat_id) < 10) {
+            if (!in_array('national_id', $missing_fields)) {
+                $missing_fields[] = 'national_id';
+            }
+        }
+
         $has_photo = !empty($student->photo_url);
 
         wp_send_json_success(array(
@@ -14612,10 +14624,9 @@ class SM_Public {
         }
 
         $student_id  = intval($_POST['student_id'] ?? 0);
-        $verify_code = sanitize_text_field($_POST['verify_code'] ?? '');
 
-        if (!$student_id || empty($verify_code)) {
-            wp_send_json_error('بيانات التحقق غير مكتملة.');
+        if (!$student_id) {
+            wp_send_json_error('يرجى تحديد الطالب المراد تحديث بياناته.');
         }
 
         $student = SM_DB::get_student_by_id($student_id);
@@ -14623,16 +14634,19 @@ class SM_Public {
             wp_send_json_error('سجل الطالب غير موجود.');
         }
 
-        $clean_input = strtolower(trim($verify_code));
-        $stu_code = strtolower(trim($student->student_code ?: ''));
-        $nat_id   = strtolower(trim($student->national_id ?: ''));
-
-        $matched = ($clean_input === $stu_code || $clean_input === $nat_id);
-        if (!$matched) {
-            wp_send_json_error('رمز التحقق غير مطابق لبيانات الطالب المسجلة.');
-        }
-
         $update_data = array();
+
+        // National ID Update
+        if (isset($_POST['national_id'])) {
+            $raw_nat_id = trim(sanitize_text_field($_POST['national_id']));
+            if (!empty($raw_nat_id)) {
+                $clean_nat_id = preg_replace('/\D/', '', $raw_nat_id);
+                if (strlen($clean_nat_id) < 10) {
+                    wp_send_json_error('يرجى إدخال رقم هوية وطنية إماراتي صحيح المكون من 15 رقم.');
+                }
+                $update_data['national_id'] = $raw_nat_id;
+            }
+        }
 
         // 1. Guardian Phone (Enforce +971 UAE Fixed Prefix)
         if (isset($_POST['guardian_phone'])) {
@@ -14726,12 +14740,19 @@ class SM_Public {
             }
         }
 
+        $stu_code_val = !empty($updated_stu->student_code) ? $updated_stu->student_code : ('STU-' . $updated_stu->id);
+        $nat_id_val   = !empty($updated_stu->national_id) ? $updated_stu->national_id : 'غير محدد';
+
         wp_send_json_success(array(
             'message' => 'تم حفظ وتحديث بيانات الطالب بنجاح.',
+            'student_code' => $stu_code_val,
+            'national_id'  => $nat_id_val,
+            'notice' => 'تنبيه هام: يرجى الاحتفاظ بكود الطالب الخاص بك (' . $stu_code_val . ') أو رقم الهوية الوطنية (' . $nat_id_val . ') بطريقة آمنة، حيث يلزم أدائهما للتحقق التلقائي لبقية خدمات البوابة.',
             'remaining_missing' => $rem_missing,
             'student' => array(
                 'id' => $updated_stu->id,
                 'name' => $updated_stu->name,
+                'student_code' => $stu_code_val,
                 'guardian_phone' => $updated_stu->guardian_phone,
                 'dob' => $updated_stu->dob,
                 'gender' => $updated_stu->gender,
@@ -15336,11 +15357,13 @@ class SM_Public {
             wp_send_json_error('خدمة التسجيل بالأنشطة الرياضية غير متاحة حالياً بالنظام.');
         }
 
-        $student_id = intval($_POST['student_id'] ?? 0);
-        $raw_sports = $_POST['sports'] ?? array();
-        $sports     = is_array($raw_sports) ? array_map('sanitize_text_field', $raw_sports) : array();
+        $student_id  = intval($_POST['student_id'] ?? 0);
+        $raw_sports  = $_POST['sports'] ?? array();
+        $sports      = is_array($raw_sports) ? array_map('sanitize_text_field', $raw_sports) : array();
+        $verify_code = sanitize_text_field($_POST['verify_code'] ?? '');
+        $dob_input   = sanitize_text_field($_POST['dob'] ?? '');
 
-        if (!$student_id) wp_send_json_error('يرجى تحديد الطالب التسجيل بالأنشطة الرياضية.');
+        if (!$student_id) wp_send_json_error('يرجى تحديد الطالب للتسجيل بالأنشطة الرياضية.');
         if (empty($sports)) wp_send_json_error('يرجى اختيار نشاط رياضي واحد على الأقل.');
 
         if (count($sports) > 2) {
@@ -15349,6 +15372,25 @@ class SM_Public {
 
         $student = SM_DB::get_student_by_id($student_id);
         if (!$student) wp_send_json_error('سجل الطالب غير موجود.');
+
+        // Validate 3-factor verification if verify_code provided
+        if (!empty($verify_code)) {
+            $clean_input = strtolower(trim($verify_code));
+            $stu_code    = strtolower(trim($student->student_code ?: ''));
+            $nat_id      = strtolower(trim($student->national_id ?: ''));
+
+            $code_matched = (!empty($stu_code) && $clean_input === $stu_code) || (!empty($nat_id) && $clean_input === $nat_id);
+
+            $dob_matched = true;
+            if (!empty($dob_input) && !empty($student->dob) && $student->dob !== '0000-00-00') {
+                $formatted_dob = date('Y-m-d', strtotime($dob_input));
+                $dob_matched   = ($formatted_dob === date('Y-m-d', strtotime($student->dob)));
+            }
+
+            if (!$code_matched || !$dob_matched) {
+                wp_send_json_error('بيانات التحقق (الكود/الهوية الوطنية أو تاريخ الميلاد) غير مطابقة لسجل الطالب.');
+            }
+        }
 
         global $wpdb;
         $acad_year = '2026/2027';

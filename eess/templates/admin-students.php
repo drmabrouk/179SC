@@ -151,7 +151,7 @@ $to_num = min($offset + $limit, $total_students_count);
             <?php endif; ?>
 
             <!-- Student Data Portal Icon Button (Aligned Next to Settings & Controls Icon) -->
-            <a href="<?php echo esc_url(get_permalink(get_option('eess_exit_card_portal_page_id')) ?: home_url('/card/')); ?>" target="_blank" title="بوابة بيانات وبطاقات الطلاب" class="eess-hdr-btn" style="background: #ffffff !important; color: #0f172a !important; border: 1px solid #cbd5e1 !important; border-radius: 8px; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; cursor: pointer; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
+            <a href="<?php echo esc_url(get_permalink(get_option('eess_exit_card_portal_page_id')) ?: home_url('/stu/')); ?>" target="_blank" title="بوابة بيانات وبطاقات الطلاب" class="eess-hdr-btn" style="background: #ffffff !important; color: #0f172a !important; border: 1px solid #cbd5e1 !important; border-radius: 8px; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; cursor: pointer; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
                 <span class="dashicons dashicons-id-alt" style="font-size: 18px; width: 18px; height: 18px; color: #0f172a;"></span>
             </a>
 
