@@ -763,7 +763,8 @@ class SM_Settings {
             'sm_public_submit_sports_registration',
             'sm_public_verify_portal_password',
             'sm_public_upload_student_photo',
-            'sm_public_submit_exit_card_instant'
+            'sm_public_submit_exit_card_instant',
+            'sm_public_withdraw_exit_card_request'
         );
 
         if (!$user_id) {

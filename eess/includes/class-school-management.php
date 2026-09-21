@@ -254,6 +254,8 @@ class School_Management {
         $this->loader->add_action('wp_ajax_nopriv_sm_public_upload_student_photo', $plugin_public, 'ajax_public_upload_student_photo');
         $this->loader->add_action('wp_ajax_sm_public_submit_exit_card_instant', $plugin_public, 'ajax_public_submit_exit_card_instant');
         $this->loader->add_action('wp_ajax_nopriv_sm_public_submit_exit_card_instant', $plugin_public, 'ajax_public_submit_exit_card_instant');
+        $this->loader->add_action('wp_ajax_sm_public_withdraw_exit_card_request', $plugin_public, 'ajax_public_withdraw_exit_card_request');
+        $this->loader->add_action('wp_ajax_nopriv_sm_public_withdraw_exit_card_request', $plugin_public, 'ajax_public_withdraw_exit_card_request');
 
         // Organizational Sub-Tab AJAX Actions
         $this->loader->add_action('wp_ajax_eess_save_subject', $plugin_public, 'ajax_eess_save_subject');

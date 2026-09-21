@@ -241,29 +241,61 @@ $service_sports       = $card_settings['service_sports'] ?? 'yes';
                         <button type="button" onclick="eessResetSelectedStudent()" style="height: 36px; padding: 0 14px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 800; font-size: 12px; cursor: pointer;">🔍 اختيار طالب آخر</button>
                     </div>
 
-                    <!-- Direct Photo Upload Area -->
+                    <!-- Direct Photo Upload Area & Requirements Guidance -->
                     <div style="background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 14px; padding: 18px; margin-bottom: 20px;">
                         <h4 style="margin: 0 0 6px 0; font-size: 14px; font-weight: 900; color: #166534;">2. التقاط / رفع الصورة الشخصية للطالب:</h4>
-                        <p style="margin: 0 0 12px 0; font-size: 12px; color: #14532d; font-weight: 600;">اختر الصورة الشخصية المعني رفعها وتحديثها فوراً بسجل الطالب وسوف تعتمد تلقائياً ببطاقة الخروج:</p>
+                        <p style="margin: 0 0 10px 0; font-size: 12px; color: #14532d; font-weight: 600;">اختر الصورة الشخصية المعنية لرفعها وتحديثها فوراً بسجل الطالب:</p>
+
+                        <div style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 10px; padding: 12px; margin-bottom: 12px; font-size: 11.5px; color: #334155; line-height: 1.6; font-weight: 700;">
+                            <div>📌 اشتراطات الصورة الشخصية المعتمدة:</div>
+                            <div style="color: #64748b;">• صورة شخصية رسمية حديثة واضحة الوجه والإضاءة.</div>
+                            <div style="color: #64748b;">• خلفية بيضاء معتمدة وفق معايير واشتراطات المدرسة.</div>
+                            <div style="color: #64748b;">• بدون تشتيت خلفي أو أشكال غير رسمية.</div>
+                        </div>
 
                         <input type="file" id="eess_stu_photo_input" accept="image/jpeg,image/png,image/webp" onchange="eessUploadStudentPhoto(this)" style="width: 100%; font-size: 12.5px; background: white; padding: 10px; border-radius: 10px; border: 1px solid #cbd5e1; box-sizing: border-box;">
                         <div id="eess_photo_upload_msg" style="margin-top: 8px; font-size: 12px; font-weight: 800;"></div>
+                        <div id="eess_photo_last_updated_lbl" style="margin-top: 4px; font-size: 11px; color: #64748b; font-weight: 700;"></div>
                     </div>
 
-                    <!-- Instant Exit Card Request Trigger -->
-                    <div style="text-align: center;">
-                        <button type="button" id="eess_btn_instant_exit" onclick="eessSubmitInstantExitCardRequest()" style="width: 100%; height: 48px; background: #881337; color: white; border: none; border-radius: 12px; font-weight: 900; font-size: 15px; cursor: pointer; box-shadow: 0 6px 16px rgba(136,19,55,0.25);">🚀 استخراج وتأكيد طلب بطاقة الخروج</button>
+                    <!-- 3 Independent Post-Upload Action Buttons -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                        <button type="button" id="eess_btn_save_photo_only" onclick="eessSavePhotoOnly()" style="height: 46px; background: #0284c7; color: white; border: none; border-radius: 10px; font-weight: 900; font-size: 13px; cursor: pointer; box-shadow: 0 4px 10px rgba(2,132,199,0.2);">💾 تحديث الصورة فقط</button>
+                        <button type="button" id="eess_btn_instant_exit" onclick="eessSubmitInstantExitCardRequest()" style="height: 46px; background: #881337; color: white; border: none; border-radius: 10px; font-weight: 900; font-size: 13px; cursor: pointer; box-shadow: 0 4px 10px rgba(136,19,55,0.2);">🚀 استخراج وتأكيد طلب بطاقة الخروج</button>
+                        <button type="button" id="eess_btn_withdraw_exit" onclick="eessPromptWithdrawExitCard()" style="height: 46px; background: #dc2626; color: white; border: none; border-radius: 10px; font-weight: 900; font-size: 13px; cursor: pointer; box-shadow: 0 4px 10px rgba(220,38,38,0.2);">🚫 سحب / إلغاء طلب تصريح الخروج</button>
                     </div>
                 </div>
 
-                <!-- INSTANT SUCCESS CARD -->
-                <div id="eess-instant-success-card" style="display: none; background: #f0fdf4; border: 2px solid #22c55e; border-radius: 16px; padding: 24px; text-align: center; margin-bottom: 20px;">
-                    <div style="width: 56px; height: 56px; background: #dcfce7; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px auto; color: #16a34a; font-size: 24px; font-weight: 900;">✓</div>
-                    <h3 style="margin: 0 0 6px 0; font-size: 18px; font-weight: 900; color: #14532d;">تم استخراج وتأكيد طلب تصريح الخروج بنجاح</h3>
-                    <p style="margin: 0 0 14px 0; font-size: 13px; color: #166534; font-weight: 700;">تم تحديث الصورة الشخصية واعتماد الطلب فوراً بسجل الطالب ورفعه لقسم إدارة التصاريح.</p>
-                    <div style="background: white; border: 1px solid #86efac; border-radius: 10px; padding: 12px; display: inline-block; margin-bottom: 18px; font-size: 14px; font-weight: 900; color: #15803d; font-family: monospace;" id="eess_instant_ref_no">EX-2026-000000</div>
+                <!-- INSTANT SUCCESS CARD WITH DETAILED CODES & METADATA -->
+                <div id="eess-instant-success-card" style="display: none; background: #ffffff; border: 2px solid #16a34a; border-radius: 18px; padding: 24px; text-align: center; margin-bottom: 20px; box-shadow: 0 8px 25px rgba(22,163,74,0.1);">
+                    <div style="width: 56px; height: 56px; background: #dcfce7; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px auto; color: #16a34a; font-size: 26px; font-weight: 900;">✓</div>
+                    <h3 style="margin: 0 0 6px 0; font-size: 18px; font-weight: 900; color: #14532d;" id="eess_succ_card_title">تم تسجيل واستخراج طلب تصريح الخروج بنجاح</h3>
+                    <p style="margin: 0 0 16px 0; font-size: 12.5px; color: #166534; font-weight: 700;" id="eess_succ_card_msg">تمت معالجة السجل واعتماده بقاعدة البيانات الرئيسية والرفع لإدارة المتابعة والتصاريح.</p>
 
-                    <div style="display: flex; gap: 10px; justify-content: center;">
+                    <!-- PROMINENT CODES DISPLAY GRID -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; text-align: right;">
+                        <div style="background: #f0f9ff; border: 1.5px solid #bae6fd; border-radius: 12px; padding: 12px;">
+                            <div style="font-size: 11px; color: #0369a1; font-weight: 800; margin-bottom: 4px;">📌 كود الطالب المعتمد (Student Code):</div>
+                            <div style="font-size: 16px; font-weight: 900; color: #0284c7; font-family: monospace;" id="eess_succ_stu_code">---</div>
+                        </div>
+
+                        <div style="background: #f0fdf4; border: 1.5px solid #bbf7d0; border-radius: 12px; padding: 12px;">
+                            <div style="font-size: 11px; color: #15803d; font-weight: 800; margin-bottom: 4px;">📋 رقم طلب تصريح الخروج (Request No):</div>
+                            <div style="font-size: 16px; font-weight: 900; color: #16a34a; font-family: monospace;" id="eess_succ_ref_no">---</div>
+                        </div>
+                    </div>
+
+                    <!-- DETAILED METADATA LIST -->
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; margin-bottom: 20px; font-size: 12px; color: #334155; line-height: 1.8; text-align: right;">
+                        <div><strong>اسم الطالب الرباعي:</strong> <span id="eess_succ_stu_name" style="font-weight: 900; color: #0f172a;">---</span></div>
+                        <div><strong>المدرسة / المؤسسة:</strong> <span id="eess_succ_school" style="font-weight: 800; color: #881337;"><?php echo esc_html($school_name); ?></span></div>
+                        <div><strong>الصف والشعبة:</strong> <span id="eess_succ_grade_section" style="font-weight: 800;">---</span></div>
+                        <div><strong>تاريخ ووقت تقديم الطلب:</strong> <span id="eess_succ_requested_at" style="font-weight: 800;">---</span></div>
+                        <div><strong>حالة الطلب الحالية:</strong> <span id="eess_succ_status_lbl" style="font-weight: 900; color: #16a34a;">---</span></div>
+                        <div><strong>آخر تحديث للصورة الشخصية:</strong> <span id="eess_succ_photo_updated_at" style="font-weight: 800;">---</span></div>
+                    </div>
+
+                    <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
                         <button type="button" onclick="eessResetSelectedStudent()" style="height: 42px; padding: 0 24px; background: #166534; color: white; border: none; border-radius: 10px; font-weight: 800; font-size: 13px; cursor: pointer;">🔍 بحث عن طالب آخر</button>
                     </div>
                 </div>
@@ -748,6 +780,24 @@ $service_sports       = $card_settings['service_sports'] ?? 'yes';
     </div>
 </div>
 
+<!-- Custom In-System Modal for Request Withdrawal -->
+<div id="eess-withdraw-confirm-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.65); z-index: 999999; align-items: center; justify-content: center; padding: 15px; box-sizing: border-box;">
+    <div style="background: white; border-radius: 20px; max-width: 440px; width: 100%; padding: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); direction: rtl; font-family: 'Cairo', sans-serif; text-align: center;">
+        <div style="width: 56px; height: 56px; background: #fef2f2; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px auto; color: #dc2626; font-size: 24px; font-weight: 900;">⚠️</div>
+        <h3 style="margin: 0 0 6px 0; font-size: 17px; font-weight: 900; color: #0f172a;">تأكيد سحب وإلغاء طلب تصريح الخروج</h3>
+        <p style="margin: 0 0 14px 0; font-size: 13px; color: #475569; line-height: 1.5;">
+            هل أنت أكر من سحب وإلغاء طلب تصريح الخروج الحالي للطالب <strong id="eess_withdraw_student_name_lbl" style="color: #881337;">---</strong>؟
+        </p>
+        <div style="background: #fffbe3; border: 1px solid #fde047; border-radius: 10px; padding: 10px; font-size: 11.5px; color: #854d0e; margin-bottom: 18px; line-height: 1.5; text-align: right;">
+            تنبيه أمني: يمكن سحب الطلب طالما لم يبدأ بالطباعة المباشرة، ولن يؤثر سحب الطلب على صورة الطالب المعتمدة بسجله الأكاديمي.
+        </div>
+        <div style="display: flex; gap: 10px; justify-content: center;">
+            <button type="button" onclick="document.getElementById('eess-withdraw-confirm-modal').style.display='none'" style="height: 40px; padding: 0 22px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 10px; font-weight: 800; font-size: 12.5px; cursor: pointer;">إلغاء</button>
+            <button type="button" id="eess_btn_confirm_withdraw" onclick="eessExecuteWithdrawExitCard()" style="height: 40px; padding: 0 22px; background: #dc2626; color: white; border: none; border-radius: 10px; font-weight: 800; font-size: 12.5px; cursor: pointer;">تأكيد سحب الطلب</button>
+        </div>
+    </div>
+</div>
+
 <!-- IN-SYSTEM DELETE CONFIRMATION MODAL -->
 <div id="eess-delete-confirm-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.65); z-index: 999999; align-items: center; justify-content: center; padding: 15px; box-sizing: border-box;">
     <div style="background: white; border-radius: 20px; max-width: 440px; width: 100%; padding: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); direction: rtl; font-family: 'Cairo', sans-serif; text-align: center;">
@@ -921,7 +971,7 @@ function eessUploadStudentPhoto(fileInput) {
     formData.append('student_photo', fileInput.files[0]);
 
     var statusMsg = document.getElementById('eess_photo_upload_msg');
-    statusMsg.innerText = 'جاري رفع وتأكيد الصورة الشخصية...';
+    statusMsg.innerText = 'جاري ضغط ورفع الصورة الشخصية بسرعة...';
     statusMsg.style.color = '#0284c7';
 
     jQuery.ajax({
@@ -935,14 +985,64 @@ function eessUploadStudentPhoto(fileInput) {
                 document.getElementById('eess_stu_current_photo_img').src = res.data.photo_url + '?_ts=' + Date.now();
                 document.getElementById('eess_photo_status_lbl').innerText = '✓ تم رفع وتحديث الصورة الشخصية بنجاح';
                 document.getElementById('eess_photo_status_lbl').style.color = '#16a34a';
-                statusMsg.innerText = '✓ تم رفع وتحديث صورة الطالب بنجاح!';
+                statusMsg.innerText = '✓ تم ضغط ورفع صورة الطالب بنجاح!';
                 statusMsg.style.color = '#16a34a';
+
+                if (res.data.photo_updated_at) {
+                    var lastUpdatedEl = document.getElementById('eess_photo_last_updated_lbl');
+                    if (lastUpdatedEl) lastUpdatedEl.innerText = 'آخر تحديث للصورة الشخصية: ' + res.data.photo_updated_at;
+                }
+
                 eessShowToast('تم تحديث صورة الطالب بنجاح.', 'success');
             } else {
                 statusMsg.innerText = '✕ ' + ((res && res.data) ? res.data : 'فشل رفع الصورة.');
                 statusMsg.style.color = '#dc2626';
                 eessShowToast((res && res.data) ? res.data : 'فشل رفع الصورة.', 'error');
             }
+        }
+    });
+}
+
+function eessSavePhotoOnly() {
+    if (!wSelectedStudent || !wSelectedStudent.id) {
+        eessShowToast('يرجى اختيار وتحديد الطالب أولاً.', 'error');
+        return;
+    }
+    eessShowToast('تم اعتماد وتحديث صورة الطالب بنجاح دون طلب بطاقة جديدة.', 'success');
+    setTimeout(function() {
+        eessResetSelectedStudent();
+    }, 1500);
+}
+
+function eessPromptWithdrawExitCard() {
+    if (!wSelectedStudent || !wSelectedStudent.id) {
+        eessShowToast('يرجى تحديد الطالب أولاً لسحب الطلب الخاص به.', 'error');
+        return;
+    }
+    document.getElementById('eess_withdraw_student_name_lbl').innerText = wSelectedStudent.name;
+    document.getElementById('eess-withdraw-confirm-modal').style.display = 'flex';
+}
+
+function eessExecuteWithdrawExitCard() {
+    if (!wSelectedStudent || !wSelectedStudent.id) return;
+
+    var token = sessionStorage.getItem('eess_portal_token') || '';
+    var btn = document.getElementById('eess_btn_confirm_withdraw');
+    if (btn) { btn.disabled = true; btn.innerText = 'جاري السحب...'; }
+
+    jQuery.post('<?php echo $ajax_url; ?>', {
+        action: 'sm_public_withdraw_exit_card_request',
+        student_id: wSelectedStudent.id,
+        portal_token: token
+    }, function(res) {
+        if (btn) { btn.disabled = false; btn.innerText = 'تأكيد سحب الطلب'; }
+        document.getElementById('eess-withdraw-confirm-modal').style.display = 'none';
+
+        if (res.success) {
+            eessShowToast(res.data.message || 'تم سحب وإلغاء طلب تصريح الخروج بنجاح.', 'success');
+            eessResetSelectedStudent();
+        } else {
+            eessShowToast(res.data || 'تعذر سحب الطلب.', 'error');
         }
     });
 }
@@ -972,9 +1072,42 @@ function eessSubmitInstantExitCardRequest() {
 
         if (res.success && res.data) {
             document.getElementById('eess-stu-selected-card').style.display = 'none';
-            document.getElementById('eess_instant_ref_no').innerText = res.data.reference_no;
+
+            var nameEl = document.getElementById('eess_succ_stu_name');
+            if (nameEl) nameEl.innerText = res.data.student_name || wSelectedStudent.name;
+
+            var codeEl = document.getElementById('eess_succ_stu_code');
+            if (codeEl) codeEl.innerText = res.data.student_code || (wSelectedStudent.code || '-');
+
+            var refEl = document.getElementById('eess_succ_ref_no');
+            if (refEl) refEl.innerText = res.data.reference_no || '-';
+
+            var gsEl = document.getElementById('eess_succ_grade_section');
+            if (gsEl) gsEl.innerText = (res.data.class_name || wSelectedStudent.class_name) + ' (' + (res.data.section || wSelectedStudent.section) + ')';
+
+            var reqAtEl = document.getElementById('eess_succ_requested_at');
+            if (reqAtEl) reqAtEl.innerText = res.data.requested_at || 'الآن';
+
+            var statusEl = document.getElementById('eess_succ_status_lbl');
+            if (statusEl) statusEl.innerText = res.data.status_label || 'قيد الاعتماد';
+
+            var photoUpdEl = document.getElementById('eess_succ_photo_updated_at');
+            if (photoUpdEl) photoUpdEl.innerText = res.data.photo_updated_at || 'حديثاً';
+
+            if (res.data.already_exists) {
+                var titleEl = document.getElementById('eess_succ_card_title');
+                if (titleEl) titleEl.innerText = 'يوجد طلب تصريح خروج فعال لهذا الطالب';
+                var msgEl = document.getElementById('eess_succ_card_msg');
+                if (msgEl) msgEl.innerText = 'الطلب المسجل حالياً فعال بقاعدة البيانات ولا داعي لتقديم طلب مكرر.';
+            } else {
+                var titleEl = document.getElementById('eess_succ_card_title');
+                if (titleEl) titleEl.innerText = 'تم تسجيل واستخراج طلب تصريح الخروج بنجاح';
+                var msgEl = document.getElementById('eess_succ_card_msg');
+                if (msgEl) msgEl.innerText = 'تمت معالجة السجل واعتماده بقاعدة البيانات الرئيسية والرفع لإدارة المتابعة والتصاريح.';
+            }
+
             document.getElementById('eess-instant-success-card').style.display = 'block';
-            eessShowToast('تم استخراج وتسجيل طلب تصريح الخروج بنجاح.', 'success');
+            eessShowToast(res.data.message || 'تم تسجيل الطلب بنجاح.', 'success');
         } else {
             eessShowToast((res && res.data) ? res.data : 'فشل تسجيل الطلب بالخادم.', 'error');
         }
