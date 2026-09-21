@@ -14418,13 +14418,12 @@ class SM_Public {
         $clean_query = trim($name_query);
         $words = array_values(array_filter(explode(' ', $clean_query)));
 
-        // Only search when at least 3 words (complete full name) are typed
-        if (count($words) < 3) {
-            wp_send_json_error('يرجى إدخال اسم الطالب الكامل (الثلاثي على الأقل) لإظهار نتائج البحث.');
+        // Only search when at least 5 characters are typed
+        if (mb_strlen($clean_query) < 5) {
+            wp_send_json_error('يرجى كتابة 5 أحرف على الأقل لبدء البحث المباشر.');
         }
 
         global $wpdb;
-        $norm_query = self::normalize_arabic_str($clean_query);
 
         $where = array();
         $params = array();
@@ -14437,13 +14436,13 @@ class SM_Public {
         }
 
         if (empty($where)) {
-            $sql = "SELECT id, name, class_name, section FROM {$wpdb->prefix}sm_students WHERE name LIKE %s ORDER BY name ASC LIMIT 15";
+            $sql = "SELECT id, name, student_code, class_name, section, photo_url FROM {$wpdb->prefix}sm_students WHERE name LIKE %s ORDER BY name ASC LIMIT 15";
             $results = $wpdb->get_results($wpdb->prepare($sql, '%' . $wpdb->esc_like($clean_query) . '%'));
         } else {
-            $sql = "SELECT id, name, class_name, section FROM {$wpdb->prefix}sm_students WHERE " . implode(" AND ", $where) . " ORDER BY name ASC LIMIT 15";
+            $sql = "SELECT id, name, student_code, class_name, section, photo_url FROM {$wpdb->prefix}sm_students WHERE " . implode(" AND ", $where) . " ORDER BY name ASC LIMIT 15";
             $results = $wpdb->get_results($wpdb->prepare($sql, $params));
             if (empty($results)) {
-                $sql = "SELECT id, name, class_name, section FROM {$wpdb->prefix}sm_students WHERE " . implode(" OR ", $where) . " ORDER BY name ASC LIMIT 15";
+                $sql = "SELECT id, name, student_code, class_name, section, photo_url FROM {$wpdb->prefix}sm_students WHERE " . implode(" OR ", $where) . " ORDER BY name ASC LIMIT 15";
                 $results = $wpdb->get_results($wpdb->prepare($sql, $params));
             }
         }
@@ -15479,5 +15478,133 @@ class SM_Public {
         }
 
         wp_send_json_error('إجراء غير معروف.');
+    }
+
+    public static function is_portal_token_valid($token) {
+        $expected = wp_hash('eess_portal_session_202620272028_' . date('Y-m-d'));
+        $expected_prev = wp_hash('eess_portal_session_202620272028_' . date('Y-m-d', strtotime('-1 day')));
+        return (!empty($token) && ($token === $expected || $token === $expected_prev));
+    }
+
+    public function ajax_public_verify_portal_password() {
+        $pwd = sanitize_text_field($_POST['password'] ?? '');
+        if ($pwd !== '202620272028') {
+            wp_send_json_error('كلمة مرور البوابة غير صحيحة.');
+        }
+
+        $token = wp_hash('eess_portal_session_202620272028_' . date('Y-m-d'));
+        wp_send_json_success(array(
+            'message' => 'تم الدخول لبوابة التقاط الصورة واستخراج البطاقات بنجاح.',
+            'token'   => $token
+        ));
+    }
+
+    public function ajax_public_upload_student_photo() {
+        $token      = sanitize_text_field($_POST['portal_token'] ?? '');
+        $student_id = intval($_POST['student_id'] ?? 0);
+
+        if (!self::is_portal_token_valid($token)) {
+            wp_send_json_error('جلسة البوابة غير صالحة أو منتهية. يرجى إعادة إدخال كلمة مرور البوابة.');
+        }
+
+        if (!$student_id) {
+            wp_send_json_error('معرف الطالب غير محدد.');
+        }
+
+        $student = SM_DB::get_student_by_id($student_id);
+        if (!$student) {
+            wp_send_json_error('سجل الطالب غير موجود بقاعدة البيانات.');
+        }
+
+        if (empty($_FILES['student_photo']['name'])) {
+            wp_send_json_error('يرجى اختيار صورة شخصية للطالب قبل الرفع.');
+        }
+
+        require_once(ABSPATH . 'wp-admin/includes/file.php');
+        require_once(ABSPATH . 'wp-admin/includes/image.php');
+        require_once(ABSPATH . 'wp-admin/includes/media.php');
+
+        $file_info = wp_check_filetype_and_ext($_FILES['student_photo']['tmp_name'], $_FILES['student_photo']['name']);
+        $allowed_mimes = array('jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp');
+
+        if (!in_array($file_info['type'], $allowed_mimes) && !array_key_exists($file_info['ext'], $allowed_mimes)) {
+            wp_send_json_error('نوع الصورة غير مدعوم. يرجى رفع صورة بصيغة JPG أو PNG أو WEBP.');
+        }
+
+        if ($_FILES['student_photo']['size'] > 5 * 1024 * 1024) {
+            wp_send_json_error('حجم الصورة يتجاوز الحد الأقصى المسموح به (5 ميجابايت).');
+        }
+
+        $attachment_id = media_handle_upload('student_photo', 0);
+        if (is_wp_error($attachment_id)) {
+            wp_send_json_error('فشل حفظ الصورة: ' . $attachment_id->get_error_message());
+        }
+
+        $new_photo_url = wp_get_attachment_url($attachment_id);
+        global $wpdb;
+        $wpdb->update("{$wpdb->prefix}sm_students", array('photo_url' => $new_photo_url), array('id' => $student_id));
+        wp_cache_flush();
+
+        if (!empty($student->parent_user_id)) {
+            update_user_meta($student->parent_user_id, 'eess_profile_photo', $new_photo_url);
+        }
+
+        SM_Logger::log('رفع صورة طالب', "تم التقاط/تحديث الصورة الشخصية للطالب: {$student->name} (ID: {$student_id})");
+
+        wp_send_json_success(array(
+            'message'   => 'تم رفع وتحديث صورة الطالب بنجاح.',
+            'photo_url' => $new_photo_url
+        ));
+    }
+
+    public function ajax_public_submit_exit_card_instant() {
+        $token      = sanitize_text_field($_POST['portal_token'] ?? '');
+        $student_id = intval($_POST['student_id'] ?? 0);
+
+        if (!self::is_portal_token_valid($token)) {
+            wp_send_json_error('جلسة البوابة غير صالحة أو منتهية. يرجى إعادة إدخال كلمة مرور البوابة.');
+        }
+
+        if (!$student_id) {
+            wp_send_json_error('معرف الطالب غير محدد.');
+        }
+
+        $student = SM_DB::get_student_by_id($student_id);
+        if (!$student) {
+            wp_send_json_error('سجل الطالب غير موجود.');
+        }
+
+        global $wpdb;
+        SM_DB::ensure_portal_tables_exist();
+
+        $acad_year = '2025/2026';
+        $ref_no    = 'EX-' . date('Y') . '-' . sprintf('%06d', rand(1000, 999999));
+
+        $inserted = $wpdb->insert("{$wpdb->prefix}sm_exit_card_requests", array(
+            'reference_no'        => $ref_no,
+            'student_id'          => $student_id,
+            'parent_name'         => $student->guardian_name ?: ($student->name . ' (ولي أمر)'),
+            'parent_phone'        => $student->guardian_phone ?: '+971500000000',
+            'academic_year'       => $acad_year,
+            'reason'              => 'طلب تصريح خروج طالب عبر البوابة السريعة',
+            'requested_date'      => current_time('Y-m-d'),
+            'status'              => 'approved',
+            'verification_status' => 'verified_by_portal',
+            'verified_at'         => current_time('mysql'),
+            'created_at'          => current_time('mysql')
+        ));
+
+        if (!$inserted) {
+            wp_send_json_error('فشل تسجيل طلب تصريح الخروج بالخادم.');
+        }
+
+        $req_id = $wpdb->insert_id;
+        SM_Logger::log('طلب بطاقة خروج سريع', "تم تقديم طلب تصريح خروج فوري للطالب: {$student->name} (الرقم المرجعي: {$ref_no})");
+
+        wp_send_json_success(array(
+            'message'      => 'تم تسجيل واستخراج طلب بطاقة تصريح الخروج بنجاح.',
+            'reference_no' => $ref_no,
+            'request_id'   => $req_id
+        ));
     }
 }

@@ -760,7 +760,10 @@ class SM_Settings {
             'sm_public_check_previous_request',
             'sm_public_submit_complaint',
             'sm_public_check_complaint_status',
-            'sm_public_submit_sports_registration'
+            'sm_public_submit_sports_registration',
+            'sm_public_verify_portal_password',
+            'sm_public_upload_student_photo',
+            'sm_public_submit_exit_card_instant'
         );
 
         if (!$user_id) {
