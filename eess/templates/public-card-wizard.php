@@ -896,9 +896,11 @@ function eessSearchStudentName() {
         if (res.success && res.data && res.data.length > 0) {
             let html = '<div style="background:#ffffff; border:1.5px solid #cbd5e1; border-radius:12px; max-height:240px; overflow-y:auto; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">';
             res.data.forEach(s => {
-                html += '<div onclick="eessSelectStudentForPhoto(' + s.id + ', \'' + s.display_name.replace(/'/g, "\\'") + '\', \'' + s.class_name + '\', \'' + s.section + '\', \'' + (s.student_code || '') + '\')" style="padding:12px 16px; border-bottom:1px solid #f1f5f9; cursor:pointer; font-size:13px; font-weight:800; color:#0f172a;" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'white\'">';
+                var stuName = s.display_name || (s.name || '');
+                var escName = stuName.replace(/'/g, "\\'");
+                html += '<div onclick="eessSelectStudentForPhoto(' + s.id + ', \'' + escName + '\', \'' + s.class_name + '\', \'' + s.section + '\', \'' + (s.student_code || '') + '\')" style="padding:12px 16px; border-bottom:1px solid #f1f5f9; cursor:pointer; font-size:13px; font-weight:800; color:#0f172a;" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'white\'">';
                 html += '<div style="display:flex; justify-content:space-between; align-items:center;">';
-                html += '<div>' + s.display_name + '</div>';
+                html += '<div>' + stuName + '</div>';
                 html += '<div style="font-size:11px; color:#881337; font-family:monospace; font-weight:900;">' + (s.student_code || 'الكود غير محدد') + '</div>';
                 html += '</div>';
                 html += '<div style="font-size:11.5px; color:#64748b; font-weight:700; margin-top:2px;">' + s.class_name + ' (' + s.section + ')</div>';
@@ -1070,7 +1072,7 @@ function eessSubmitInstantExitCardRequest() {
             btn.innerText = '🚀 استخراج وتأكيد طلب بطاقة الخروج';
         }
 
-        if (res.success && res.data) {
+        if (res && res.success && res.data) {
             document.getElementById('eess-stu-selected-card').style.display = 'none';
 
             var nameEl = document.getElementById('eess_succ_stu_name');
@@ -1108,9 +1110,17 @@ function eessSubmitInstantExitCardRequest() {
 
             document.getElementById('eess-instant-success-card').style.display = 'block';
             eessShowToast(res.data.message || 'تم تسجيل الطلب بنجاح.', 'success');
+
+            if (typeof wLoadCardRequestsFull === 'function') wLoadCardRequestsFull();
         } else {
             eessShowToast((res && res.data) ? res.data : 'فشل تسجيل الطلب بالخادم.', 'error');
         }
+    }).fail(function(xhr, status, error) {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerText = '🚀 استخراج وتأكيد طلب بطاقة الخروج';
+        }
+        eessShowToast('حدث خطأ في الاتصال بالخادم: ' + (error || 'يرجى المحاولة مرة أخرى.'), 'error');
     });
 }
 
