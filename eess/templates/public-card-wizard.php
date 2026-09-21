@@ -179,19 +179,98 @@ $service_sports       = $card_settings['service_sports'] ?? 'yes';
     <!-- LEFT CONTENT PANEL -->
     <div id="eess-portal-content-panel" class="eess-portal-left-content">
 
-        <!-- VIEW 1: WIZARD & SERVICES -->
+        <!-- VIEW 1: DEDICATED PHOTO & EXIT CARD PORTAL -->
         <div id="pv-view-wizard" style="display: block;">
-            <!-- Header Banner -->
-            <div style="text-align: center; border-bottom: 2px solid #f1f5f9; padding-bottom: 18px; margin-bottom: 20px;">
-                <div style="width: 72px; height: 72px; margin: 0 auto 10px auto; background: #ffffff; border-radius: 16px; padding: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); border: 1px solid #cbd5e1; display: flex; align-items: center; justify-content: center;">
+
+            <!-- ACCESS GATE SCREEN (LOCKED UNTIL PASSWORD 202620272028 IS ENTERED) -->
+            <div id="eess-portal-access-gate" style="display: block; max-width: 480px; margin: 40px auto; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); padding: 32px; text-align: center; direction: rtl; font-family: 'Cairo', sans-serif;">
+                <div style="width: 72px; height: 72px; margin: 0 auto 14px auto; background: #ffffff; border-radius: 16px; padding: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); border: 1px solid #cbd5e1; display: flex; align-items: center; justify-content: center;">
                     <img src="<?php echo esc_url($sys_logo); ?>" style="width: 100%; height: 100%; object-fit: contain; border-radius: 12px;" alt="Logo">
                 </div>
-                <h2 style="margin: 0 0 4px 0; font-size: 20px; font-weight: 900; color: #0f172a;"><?php echo esc_html($school_name); ?></h2>
-                <div style="font-size: 13px; color: #881337; font-weight: 800;" id="w_portal_subtitle_text">بوابة الخدمات الطلابية الموحدة والرقمية</div>
+                <h2 style="margin: 0 0 6px 0; font-size: 19px; font-weight: 900; color: #0f172a;"><?php echo esc_html($school_name); ?></h2>
+                <div style="font-size: 13.5px; color: #881337; font-weight: 800; margin-bottom: 20px;">بوابة التقاط الصور واستخراج بطاقات الخروج</div>
+
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 20px; margin-bottom: 18px;">
+                    <label style="font-size: 12.5px; font-weight: 800; color: #334155; display: block; margin-bottom: 8px;">أدخل كلمة مرور البوابة للمتابعة <span style="color:#ef4444;">*</span></label>
+                    <input type="password" id="eess_portal_pwd_input" placeholder="كلمة المرور..." onkeyup="if(event.key==='Enter') eessVerifyPortalPassword()" style="width: 100%; height: 46px; border-radius: 12px; border: 1.5px solid #cbd5e1; padding: 0 16px; font-size: 15px; font-weight: 800; text-align: center; letter-spacing: 2px; box-sizing: border-box;">
+                    <button type="button" onclick="eessVerifyPortalPassword()" id="eess_btn_unlock_portal" style="width: 100%; height: 46px; background: #881337; color: white; border: none; border-radius: 12px; font-weight: 900; font-size: 14px; cursor: pointer; margin-top: 14px; box-shadow: 0 4px 12px rgba(136,19,55,0.25);">دخول البوابة الرقمية 🔒</button>
+                </div>
+                <div style="font-size: 11px; color: #94a3b8; font-weight: 600;">الدخول محمي بكلمة مرور البوابة المعتمدة ولا يتطلب تسجيل دخول حساب شخصي.</div>
             </div>
 
-            <!-- STEP 0: SERVICE SELECTION SCREEN (FIRST SCREEN BEFORE STEP 1) -->
-            <div id="w-panel-step-0" style="display: block;">
+            <!-- UNLOCKED PORTAL WORKFLOW (SEARCH -> PHOTO UPLOAD -> INSTANT EXIT CARD REQUEST) -->
+            <div id="eess-portal-unlocked-workflow" style="display: none;">
+                <!-- Header Banner with Lock Option -->
+                <div style="border-bottom: 2px solid #f1f5f9; padding-bottom: 16px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <img src="<?php echo esc_url($sys_logo); ?>" style="width: 44px; height: 44px; object-fit: contain; border-radius: 10px; border: 1px solid #cbd5e1; padding: 2px;" alt="Logo">
+                        <div>
+                            <h3 style="margin: 0; font-size: 16px; font-weight: 900; color: #0f172a;"><?php echo esc_html($school_name); ?></h3>
+                            <div style="font-size: 12px; color: #881337; font-weight: 800;">بوابة الالتقاط السريع وقارئ البطاقات</div>
+                        </div>
+                    </div>
+                    <button type="button" onclick="eessLockPortalSession()" style="height: 36px; padding: 0 16px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 800; font-size: 12px; cursor: pointer;">🔒 إغلاق/قفل البوابة</button>
+                </div>
+
+                <!-- STEP 1: STUDENT SEARCH (REQUIRES >= 5 CHARACTERS) -->
+                <div style="background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 16px; padding: 22px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+                    <h3 style="margin: 0 0 6px 0; font-size: 16px; font-weight: 900; color: #0f172a;">1. البحث عن الطالب واختيار السجل:</h3>
+                    <p style="margin: 0 0 14px 0; font-size: 12px; color: #64748b; font-weight: 600;">ادخل اسم الطالب (يلزم كتابة 5 أحرف على الأقل لعرض الاقتراحات المباشرة):</p>
+
+                    <div style="position: relative;">
+                        <input type="text" id="eess_stu_search_input" oninput="eessDebounceSearchStudent()" placeholder="ابحث عن اسم الطالب الرباعي أو الثلاثي..." style="width: 100%; height: 46px; border-radius: 10px; border: 1.5px solid #cbd5e1; padding: 0 16px; font-size: 13.5px; font-weight: 800; box-sizing: border-box;">
+                        <div id="eess_stu_search_suggestions" style="display: none; position: absolute; top: 50px; right: 0; left: 0; z-index: 99999;"></div>
+                    </div>
+                </div>
+
+                <!-- STEP 2: SELECTED STUDENT & PHOTO UPLOAD CARD -->
+                <div id="eess-stu-selected-card" style="display: none; background: #ffffff; border: 2px solid #881337; border-radius: 16px; padding: 22px; margin-bottom: 20px; box-shadow: 0 8px 20px rgba(136,19,55,0.08);">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; margin-bottom: 20px; border-bottom: 1px solid #f1f5f9; padding-bottom: 16px;">
+                        <div style="display: flex; align-items: center; gap: 16px;">
+                            <div style="width: 72px; height: 84px; border-radius: 10px; border: 2px solid #cbd5e1; overflow: hidden; background: #f8fafc; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+                                <img id="eess_stu_current_photo_img" src="<?php echo esc_url($sys_logo); ?>" style="width: 100%; height: 100%; object-fit: cover;" alt="Student Photo">
+                            </div>
+                            <div>
+                                <div style="font-size: 11px; color: #166534; font-weight: 800; margin-bottom: 2px;">✓ الطالب المحدد:</div>
+                                <h3 style="margin: 0 0 4px 0; font-size: 18px; font-weight: 900; color: #0f172a;" id="eess_sel_stu_name">---</h3>
+                                <div style="font-size: 12.5px; color: #881337; font-weight: 800;" id="eess_sel_stu_meta">---</div>
+                                <div style="font-size: 11.5px; margin-top: 4px; font-weight: 700;" id="eess_photo_status_lbl">---</div>
+                            </div>
+                        </div>
+
+                        <button type="button" onclick="eessResetSelectedStudent()" style="height: 36px; padding: 0 14px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 800; font-size: 12px; cursor: pointer;">🔍 اختيار طالب آخر</button>
+                    </div>
+
+                    <!-- Direct Photo Upload Area -->
+                    <div style="background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 14px; padding: 18px; margin-bottom: 20px;">
+                        <h4 style="margin: 0 0 6px 0; font-size: 14px; font-weight: 900; color: #166534;">2. التقاط / رفع الصورة الشخصية للطالب:</h4>
+                        <p style="margin: 0 0 12px 0; font-size: 12px; color: #14532d; font-weight: 600;">اختر الصورة الشخصية المعني رفعها وتحديثها فوراً بسجل الطالب وسوف تعتمد تلقائياً ببطاقة الخروج:</p>
+
+                        <input type="file" id="eess_stu_photo_input" accept="image/jpeg,image/png,image/webp" onchange="eessUploadStudentPhoto(this)" style="width: 100%; font-size: 12.5px; background: white; padding: 10px; border-radius: 10px; border: 1px solid #cbd5e1; box-sizing: border-box;">
+                        <div id="eess_photo_upload_msg" style="margin-top: 8px; font-size: 12px; font-weight: 800;"></div>
+                    </div>
+
+                    <!-- Instant Exit Card Request Trigger -->
+                    <div style="text-align: center;">
+                        <button type="button" id="eess_btn_instant_exit" onclick="eessSubmitInstantExitCardRequest()" style="width: 100%; height: 48px; background: #881337; color: white; border: none; border-radius: 12px; font-weight: 900; font-size: 15px; cursor: pointer; box-shadow: 0 6px 16px rgba(136,19,55,0.25);">🚀 استخراج وتأكيد طلب بطاقة الخروج</button>
+                    </div>
+                </div>
+
+                <!-- INSTANT SUCCESS CARD -->
+                <div id="eess-instant-success-card" style="display: none; background: #f0fdf4; border: 2px solid #22c55e; border-radius: 16px; padding: 24px; text-align: center; margin-bottom: 20px;">
+                    <div style="width: 56px; height: 56px; background: #dcfce7; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px auto; color: #16a34a; font-size: 24px; font-weight: 900;">✓</div>
+                    <h3 style="margin: 0 0 6px 0; font-size: 18px; font-weight: 900; color: #14532d;">تم استخراج وتأكيد طلب تصريح الخروج بنجاح</h3>
+                    <p style="margin: 0 0 14px 0; font-size: 13px; color: #166534; font-weight: 700;">تم تحديث الصورة الشخصية واعتماد الطلب فوراً بسجل الطالب ورفعه لقسم إدارة التصاريح.</p>
+                    <div style="background: white; border: 1px solid #86efac; border-radius: 10px; padding: 12px; display: inline-block; margin-bottom: 18px; font-size: 14px; font-weight: 900; color: #15803d; font-family: monospace;" id="eess_instant_ref_no">EX-2026-000000</div>
+
+                    <div style="display: flex; gap: 10px; justify-content: center;">
+                        <button type="button" onclick="eessResetSelectedStudent()" style="height: 42px; padding: 0 24px; background: #166534; color: white; border: none; border-radius: 10px; font-weight: 800; font-size: 13px; cursor: pointer;">🔍 بحث عن طالب آخر</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- OLD WIZARD PANEL (RETAINED FOR BACKWARD COMPATIBILITY IF NEEDED) -->
+            <div id="w-panel-step-0" style="display: none;">
                 <h3 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 900; color: #0f172a; text-align: center;">اختر الخدمة المطلوبة للمتابعة:</h3>
                 <p style="margin: 0 0 20px 0; font-size: 12px; color: #64748b; text-align: center;">يرجى تحديد إحدى الخدمات المتاحة للبدء في إدخال بيانات الطالب المعني:</p>
 
@@ -690,6 +769,218 @@ $service_sports       = $card_settings['service_sports'] ?? 'yes';
 </div>
 
 <script>
+document.addEventListener('DOMContentLoaded', function() {
+    var token = sessionStorage.getItem('eess_portal_token');
+    if (token) {
+        var gate = document.getElementById('eess-portal-access-gate');
+        var main = document.getElementById('eess-portal-unlocked-workflow');
+        if (gate) gate.style.display = 'none';
+        if (main) main.style.display = 'block';
+    }
+});
+
+function eessVerifyPortalPassword() {
+    var pwdInput = document.getElementById('eess_portal_pwd_input');
+    var pwd = pwdInput ? pwdInput.value.trim() : '';
+    if (!pwd) {
+        eessShowToast('يرجى إدخال كلمة مرور البوابة.', 'error');
+        return;
+    }
+
+    var btn = document.getElementById('eess_btn_unlock_portal');
+    if (btn) { btn.disabled = true; btn.innerText = 'جاري التحقق...'; }
+
+    jQuery.post('<?php echo $ajax_url; ?>', {
+        action: 'sm_public_verify_portal_password',
+        password: pwd
+    }, function(res) {
+        if (btn) { btn.disabled = false; btn.innerText = 'دخول البوابة الرقمية 🔒'; }
+        if (res.success && res.data && res.data.token) {
+            sessionStorage.setItem('eess_portal_token', res.data.token);
+            eessShowToast(res.data.message || 'تم الدخول بنجاح.', 'success');
+            var gate = document.getElementById('eess-portal-access-gate');
+            var main = document.getElementById('eess-portal-unlocked-workflow');
+            if (gate) gate.style.display = 'none';
+            if (main) main.style.display = 'block';
+        } else {
+            eessShowToast((res && res.data) ? res.data : 'كلمة المرور غير صحيحة.', 'error');
+        }
+    });
+}
+
+function eessLockPortalSession() {
+    sessionStorage.removeItem('eess_portal_token');
+    eessResetSelectedStudent();
+    var gate = document.getElementById('eess-portal-access-gate');
+    var main = document.getElementById('eess-portal-unlocked-workflow');
+    if (gate) gate.style.display = 'block';
+    if (main) main.style.display = 'none';
+    eessShowToast('تم قفل البوابة وإغلاق الجلسة.', 'success');
+}
+
+function eessDebounceSearchStudent() {
+    clearTimeout(wSearchTimeout);
+    wSearchTimeout = setTimeout(eessSearchStudentName, 300);
+}
+
+function eessSearchStudentName() {
+    var val = document.getElementById('eess_stu_search_input').value.trim();
+    var suggestions = document.getElementById('eess_stu_search_suggestions');
+
+    // Requirement: Start searching ONLY after entering at least 5 characters
+    if (val.length < 5) {
+        suggestions.style.display = 'none';
+        return;
+    }
+
+    suggestions.style.display = 'block';
+    suggestions.innerHTML = '<div style="text-align:center; padding:12px; font-weight:700; color:#64748b; font-size:12px;">جاري البحث عن تطابقات...</div>';
+
+    var token = sessionStorage.getItem('eess_portal_token') || '';
+
+    jQuery.post('<?php echo $ajax_url; ?>', {
+        action: 'sm_public_search_student',
+        name_query: val,
+        portal_token: token
+    }, function(res) {
+        if (res.success && res.data && res.data.length > 0) {
+            let html = '<div style="background:#ffffff; border:1.5px solid #cbd5e1; border-radius:12px; max-height:240px; overflow-y:auto; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">';
+            res.data.forEach(s => {
+                html += '<div onclick="eessSelectStudentForPhoto(' + s.id + ', \'' + s.display_name.replace(/'/g, "\\'") + '\', \'' + s.class_name + '\', \'' + s.section + '\', \'' + (s.student_code || '') + '\')" style="padding:12px 16px; border-bottom:1px solid #f1f5f9; cursor:pointer; font-size:13px; font-weight:800; color:#0f172a;" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'white\'">';
+                html += '<div style="display:flex; justify-content:space-between; align-items:center;">';
+                html += '<div>' + s.display_name + '</div>';
+                html += '<div style="font-size:11px; color:#881337; font-family:monospace; font-weight:900;">' + (s.student_code || 'الكود غير محدد') + '</div>';
+                html += '</div>';
+                html += '<div style="font-size:11.5px; color:#64748b; font-weight:700; margin-top:2px;">' + s.class_name + ' (' + s.section + ')</div>';
+                html += '</div>';
+            });
+            html += '</div>';
+            suggestions.innerHTML = html;
+        } else {
+            suggestions.innerHTML = '<div style="background:#fef2f2; border:1px solid #fecdd3; border-radius:12px; padding:14px; color:#991b1b; font-size:12.5px; font-weight:700; text-align:center;">لم يتم العثور على طالب يطابق البحث (يلزم إدخال 5 أحرف على الأقل).</div>';
+        }
+    });
+}
+
+function eessSelectStudentForPhoto(id, displayName, className, section, code) {
+    wSelectedStudent = { id: id, name: displayName, class_name: className, section: section, code: code };
+    document.getElementById('eess_sel_stu_name').innerText = displayName;
+    document.getElementById('eess_sel_stu_meta').innerText = 'الكود: ' + (code || '-') + ' | الصف: ' + className + ' (' + section + ')';
+
+    document.getElementById('eess-stu-selected-card').style.display = 'block';
+    document.getElementById('eess-instant-success-card').style.display = 'none';
+    document.getElementById('eess_stu_search_suggestions').style.display = 'none';
+
+    var token = sessionStorage.getItem('eess_portal_token') || '';
+    jQuery.post('<?php echo $ajax_url; ?>', {
+        action: 'sm_public_verify_student',
+        student_id: id,
+        portal_token: token,
+        service: 'update_data',
+        verify_code: 'NAME_ONLY'
+    }, function(res) {
+        if (res.success && res.data && res.data.student) {
+            var photoUrl = res.data.student.photo_url;
+            var imgEl = document.getElementById('eess_stu_current_photo_img');
+            if (photoUrl) {
+                imgEl.src = photoUrl;
+                document.getElementById('eess_photo_status_lbl').innerText = '✓ صورة شخصية مسجلة بالنظام';
+                document.getElementById('eess_photo_status_lbl').style.color = '#16a34a';
+            } else {
+                imgEl.src = '<?php echo esc_url($sys_logo); ?>';
+                document.getElementById('eess_photo_status_lbl').innerText = '⚠️ لا توجد صورة شخصية مسجلة للطالب بعد';
+                document.getElementById('eess_photo_status_lbl').style.color = '#dc2626';
+            }
+        }
+    });
+}
+
+function eessResetSelectedStudent() {
+    wSelectedStudent = null;
+    document.getElementById('eess_stu_search_input').value = '';
+    document.getElementById('eess_stu_search_suggestions').style.display = 'none';
+    document.getElementById('eess-stu-selected-card').style.display = 'none';
+    document.getElementById('eess-instant-success-card').style.display = 'none';
+    var photoInp = document.getElementById('eess_stu_photo_input');
+    if (photoInp) photoInp.value = '';
+    document.getElementById('eess_photo_upload_msg').innerText = '';
+}
+
+function eessUploadStudentPhoto(fileInput) {
+    if (!wSelectedStudent || !wSelectedStudent.id) {
+        eessShowToast('يرجى تحديد الطالب أولاً.', 'error');
+        return;
+    }
+    if (!fileInput || !fileInput.files || !fileInput.files[0]) return;
+
+    var token = sessionStorage.getItem('eess_portal_token') || '';
+    var formData = new FormData();
+    formData.append('action', 'sm_public_upload_student_photo');
+    formData.append('student_id', wSelectedStudent.id);
+    formData.append('portal_token', token);
+    formData.append('student_photo', fileInput.files[0]);
+
+    var statusMsg = document.getElementById('eess_photo_upload_msg');
+    statusMsg.innerText = 'جاري رفع وتأكيد الصورة الشخصية...';
+    statusMsg.style.color = '#0284c7';
+
+    jQuery.ajax({
+        url: '<?php echo $ajax_url; ?>',
+        type: 'POST',
+        data: formData,
+        contentType: false,
+        processData: false,
+        success: function(res) {
+            if (res.success && res.data && res.data.photo_url) {
+                document.getElementById('eess_stu_current_photo_img').src = res.data.photo_url + '?_ts=' + Date.now();
+                document.getElementById('eess_photo_status_lbl').innerText = '✓ تم رفع وتحديث الصورة الشخصية بنجاح';
+                document.getElementById('eess_photo_status_lbl').style.color = '#16a34a';
+                statusMsg.innerText = '✓ تم رفع وتحديث صورة الطالب بنجاح!';
+                statusMsg.style.color = '#16a34a';
+                eessShowToast('تم تحديث صورة الطالب بنجاح.', 'success');
+            } else {
+                statusMsg.innerText = '✕ ' + ((res && res.data) ? res.data : 'فشل رفع الصورة.');
+                statusMsg.style.color = '#dc2626';
+                eessShowToast((res && res.data) ? res.data : 'فشل رفع الصورة.', 'error');
+            }
+        }
+    });
+}
+
+function eessSubmitInstantExitCardRequest() {
+    if (!wSelectedStudent || !wSelectedStudent.id) {
+        eessShowToast('يرجى تحديد الطالب أولاً.', 'error');
+        return;
+    }
+
+    var token = sessionStorage.getItem('eess_portal_token') || '';
+    var btn = document.getElementById('eess_btn_instant_exit');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerText = 'جاري تسجيل واستخراج طلب البطاقة...';
+    }
+
+    jQuery.post('<?php echo $ajax_url; ?>', {
+        action: 'sm_public_submit_exit_card_instant',
+        student_id: wSelectedStudent.id,
+        portal_token: token
+    }, function(res) {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerText = '🚀 استخراج وتأكيد طلب بطاقة الخروج';
+        }
+
+        if (res.success && res.data) {
+            document.getElementById('eess-stu-selected-card').style.display = 'none';
+            document.getElementById('eess_instant_ref_no').innerText = res.data.reference_no;
+            document.getElementById('eess-instant-success-card').style.display = 'block';
+            eessShowToast('تم استخراج وتسجيل طلب تصريح الخروج بنجاح.', 'success');
+        } else {
+            eessShowToast((res && res.data) ? res.data : 'فشل تسجيل الطلب بالخادم.', 'error');
+        }
+    });
+}
+
 let wActiveService = 'update_data';
 let wSelectedStudent = null;
 let wVerifiedData = null;

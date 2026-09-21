@@ -247,6 +247,14 @@ class School_Management {
         $this->loader->add_action('wp_ajax_nopriv_sm_public_submit_sports_registration', $plugin_public, 'ajax_public_submit_sports_registration');
         $this->loader->add_action('wp_ajax_sm_manage_sports_registrations', $plugin_public, 'ajax_manage_sports_registrations');
 
+        // Dedicated Photo & Exit Card Portal Access & Instant Actions
+        $this->loader->add_action('wp_ajax_sm_public_verify_portal_password', $plugin_public, 'ajax_public_verify_portal_password');
+        $this->loader->add_action('wp_ajax_nopriv_sm_public_verify_portal_password', $plugin_public, 'ajax_public_verify_portal_password');
+        $this->loader->add_action('wp_ajax_sm_public_upload_student_photo', $plugin_public, 'ajax_public_upload_student_photo');
+        $this->loader->add_action('wp_ajax_nopriv_sm_public_upload_student_photo', $plugin_public, 'ajax_public_upload_student_photo');
+        $this->loader->add_action('wp_ajax_sm_public_submit_exit_card_instant', $plugin_public, 'ajax_public_submit_exit_card_instant');
+        $this->loader->add_action('wp_ajax_nopriv_sm_public_submit_exit_card_instant', $plugin_public, 'ajax_public_submit_exit_card_instant');
+
         // Organizational Sub-Tab AJAX Actions
         $this->loader->add_action('wp_ajax_eess_save_subject', $plugin_public, 'ajax_eess_save_subject');
         $this->loader->add_action('wp_ajax_eess_save_grade', $plugin_public, 'ajax_eess_save_grade');
