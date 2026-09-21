@@ -1320,6 +1320,84 @@ class SM_DB {
         }
     }
 
+    public static function ensure_portal_tables_exist() {
+        self::ensure_exit_card_requests_columns_exist();
+        self::ensure_student_columns_exist();
+
+        global $wpdb;
+        $charset_collate = $wpdb->get_charset_collate();
+
+        // Ensure sm_exit_card_requests table exists
+        $tbl_exit = "{$wpdb->prefix}sm_exit_card_requests";
+        if ($wpdb->get_var("SHOW TABLES LIKE '$tbl_exit'") !== $tbl_exit) {
+            $wpdb->query("CREATE TABLE $tbl_exit (
+                id bigint(20) NOT NULL AUTO_INCREMENT,
+                reference_no varchar(50) DEFAULT NULL,
+                student_id bigint(20) NOT NULL,
+                parent_user_id bigint(20) DEFAULT NULL,
+                parent_name varchar(255) DEFAULT NULL,
+                parent_phone varchar(50) DEFAULT NULL,
+                academic_year varchar(50) DEFAULT '2025/2026' NOT NULL,
+                reason varchar(255) DEFAULT 'طلب تصريح خروج طالب' NOT NULL,
+                requested_date date DEFAULT NULL,
+                notes text DEFAULT NULL,
+                status varchar(50) DEFAULT 'submitted' NOT NULL,
+                verification_status varchar(50) DEFAULT 'pending_verification',
+                verified_at datetime DEFAULT NULL,
+                created_at datetime DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                PRIMARY KEY (id),
+                KEY student_id (student_id),
+                KEY status (status)
+            ) $charset_collate;");
+        }
+
+        // Ensure sm_complaints table exists
+        $tbl_cmp = "{$wpdb->prefix}sm_complaints";
+        if ($wpdb->get_var("SHOW TABLES LIKE '$tbl_cmp'") !== $tbl_cmp) {
+            $wpdb->query("CREATE TABLE $tbl_cmp (
+                id bigint(20) NOT NULL AUTO_INCREMENT,
+                reference_no varchar(50) NOT NULL,
+                student_id bigint(20) NOT NULL,
+                title varchar(255) NOT NULL,
+                details text NOT NULL,
+                status varchar(50) DEFAULT 'submitted' NOT NULL,
+                admin_notes text DEFAULT NULL,
+                created_at datetime DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                PRIMARY KEY (id),
+                KEY student_id (student_id)
+            ) $charset_collate;");
+        }
+
+        // Ensure sm_sports_registrations table exists
+        $tbl_spt = "{$wpdb->prefix}sm_sports_registrations";
+        if ($wpdb->get_var("SHOW TABLES LIKE '$tbl_spt'") !== $tbl_spt) {
+            $wpdb->query("CREATE TABLE $tbl_spt (
+                id bigint(20) NOT NULL AUTO_INCREMENT,
+                student_id bigint(20) NOT NULL,
+                academic_year varchar(50) DEFAULT '2026/2027' NOT NULL,
+                selected_sports text NOT NULL,
+                status varchar(50) DEFAULT 'registered' NOT NULL,
+                created_at datetime DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                PRIMARY KEY (id),
+                KEY student_id (student_id)
+            ) $charset_collate;");
+        }
+
+        // Ensure sm_student_meta table exists
+        $tbl_meta = "{$wpdb->prefix}sm_student_meta";
+        if ($wpdb->get_var("SHOW TABLES LIKE '$tbl_meta'") !== $tbl_meta) {
+            $wpdb->query("CREATE TABLE $tbl_meta (
+                id bigint(20) NOT NULL AUTO_INCREMENT,
+                student_id bigint(20) NOT NULL,
+                meta_key varchar(255) NOT NULL,
+                meta_value longtext DEFAULT NULL,
+                PRIMARY KEY (id),
+                KEY student_id (student_id),
+                KEY meta_key (meta_key(191))
+            ) $charset_collate;");
+        }
+    }
+
     public static function ensure_exit_card_requests_columns_exist() {
         global $wpdb;
         $table = "{$wpdb->prefix}sm_exit_card_requests";
